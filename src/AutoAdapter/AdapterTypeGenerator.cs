@@ -931,7 +931,6 @@ namespace AutoAdapter
                     ilGen.Emit(OpCodes.Ldarg_0);
                     ilGen.Emit(OpCodes.Ldfld, context.BaseObjectField);
                     ilGen.EmitParameters(methodInfo, proxiedMethod, context);
-
                     ilGen.Emit(OpCodes.Callvirt, proxiedMethod);
                 }
 

@@ -54,11 +54,11 @@ namespace AutoAdapter
         /// <summary>
         /// Gets the adapted type.
         /// </summary>
-        public Type AdaptedType { get; private set; }
+        public Type AdaptedType { get; }
 
         /// <summary>
         /// Gets the adapted type name.
         /// </summary>
-        public string AdaptedTypeName { get; private set; }
+        public string AdaptedTypeName { get; }
     }
 }

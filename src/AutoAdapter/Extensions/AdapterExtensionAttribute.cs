@@ -3,7 +3,7 @@
     using System;
 
     /// <summary>
-    /// An attribute to allow an <see cref="AdapterExtension"/> to be applied to a parameter, property, or return value.
+    /// An attribute to allow an adapter extension to be applied to a parameter, property, or return value.
     /// </summary>
     [AttributeUsage(AttributeTargets.ReturnValue | AttributeTargets.Parameter | AttributeTargets.Property)]
     public class AdapterExtensionAttribute

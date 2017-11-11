@@ -256,34 +256,32 @@ namespace AutoAdapter.Reflection
         }
 
         /// <summary>
-        /// Emits the IL for the <see cref="IAdaptedObject"/> interfaces 'AdaptedObject' property.
+        /// Emits the IL to get the adapted object if the given type instance implements
+        /// the <see cref="IAdaptedObject"/> interface.
         /// </summary>
         /// <param name="ilGen">The <see cref="ILGenerator"/> to use.</param>
-        /// <param name="parmValue">The <see cref="LocalBuilder"/> for the local variable which holds the adapted object reference.</param>
-        public static ILGenerator EmitGetAdaptedObject(this ILGenerator ilGen, LocalBuilder parmValue)
+        /// <param name="localValue">The <see cref="LocalBuilder"/> for the local variable which holds value reference.</param>
+        public static ILGenerator EmitGetAdaptedObject(this ILGenerator ilGen, LocalBuilder localValue)
         {
             Label end = ilGen.DefineLabel();
             LocalBuilder local = ilGen.DeclareLocal<bool>();
 
             ilGen.EmitTypeOf<IAdaptedObject>();
-            ilGen.Emit(OpCodes.Ldloc_S, parmValue);
+            ilGen.Emit(OpCodes.Ldloc_S, localValue);
             ilGen.Emit(OpCodes.Callvirt, Object_GetType);
             ilGen.Emit(OpCodes.Callvirt, Type_IsAssignableFrom);
-            // This local is probably not required!
-            // ilGen.Emit(OpCodes.Stloc_S, local);
-            // ilGen.Emit(OpCodes.Ldloc_S, local);
             ilGen.Emit(OpCodes.Brtrue_S, end);
             ilGen.Emit(OpCodes.Nop);
             ilGen.ThrowException(typeof(NotSupportedException));
             ilGen.MarkLabel(end);
-            ilGen.Emit(OpCodes.Ldloc_S, parmValue);
+            ilGen.Emit(OpCodes.Ldloc_S, localValue);
             ilGen.Emit(OpCodes.Callvirt, IAdaptedObject_AdaptedObject.GetGetMethod());
 
             return ilGen;
         }
 
         /// <summary>
-        /// Emits IL for the execution of an <see cref="AdapterTypeGenerator"/> extension method.
+        /// Emits IL for the execution of an adpater extension method.
         /// </summary>
         /// <param name="emitter">The <see cref="ILGenerator"/> to use.</param>
         /// <param name="extensionMethodName">The name of the extension method.</param>
@@ -313,13 +311,6 @@ namespace AutoAdapter.Reflection
 
             LocalBuilder extensionMethodLocal = methodIL.DeclareLocal(extensionMethodType);
             LocalBuilder adapterExtensionLocal = methodIL.DeclareLocal(adapterExtensionType);
-
-            //LocalBuilder extensionMethodResolverLocal = methodIL.DeclareLocal(typeof(IDependencyResolver));
-            //LocalBuilder extensionMethodScopeLocal = methodIL.DeclareLocal(typeof(IDependencyScope));
-
-            //ILocal extensionMethodLocal, adapterExtensionLocal;
-            //ILocal extensionMethodResolverLocal;
-            //ILocal extensionMethodsLocal;
 
             Label extensionExecute = methodIL.DefineLabel();
             Label afterExecute = methodIL.DefineLabel();
@@ -353,66 +344,6 @@ namespace AutoAdapter.Reflection
             methodIL.Emit(OpCodes.Stloc_S, destinationLocal);
 
             methodIL.MarkLabel(afterExecute);
-
-/*
-            emitter
-                .DefineLabel("extensionExecute", out extensionExecute)
-                .DefineLabel("afterExecute", out afterExecute)
-                .DefineLabel("endFinally", out endFinally)
-                .DeclareLocal(extensionMethodType, "extensionMethodLocal", out extensionMethodLocal)
-                .DeclareLocal(adapterExtensionType, "adapterExtensionLocal", out adapterExtensionLocal)
-                //.DeclareLocal<IServiceProvider>("extensionMethodResolverLocal", out extensionMethodResolverLocal)
-                .DeclareLocal<object[]>("extensionMethodsLocal", out extensionMethodsLocal);
-                //.DeclareLocal<IDependencyScope>();
-
-            // Call begin scope.
-            emitter
-            // Find Func<T, TResult>
-            //     .LdArg0()
-            //     .LdFld(context.ServiceProviderField)
-            //     .TypeOf(extensionMethodType)
-            //     .CallVirt(getExtensionMethod)
-            //     .StLoc(extensionMethodsLocal)
-
-            //     .LdStr(extensionMethodName)
-            //     .CastClass(extensionMethodType)
-            //     .StLoc(extensionMethodLocal)
-
-            // // Was it found?
-            //     .LdLoc(extensionMethodLocal)
-            //     .BrTrueS(extensionExecute)
-
-            // Find IAdapterExtension<T, TResult>
-                .Nop()
-                .LdArg0()
-                .LdFld(context.ServiceProviderField)
-                .LdStr(extensionMethodName)
-                //.TypeOf(adapterExtensionType)
-                .CallVirt(getExtensionMethod)
-                //.CastClass(adapterExtensionType)
-                .StLoc(adapterExtensionLocal)
-
-            // Was it found?
-                .LdLoc(adapterExtensionLocal)
-                .BrFalseS(afterExecute)
-
-            // Get function.
-                .Nop()
-                .LdLoc(adapterExtensionLocal)
-                .CallVirt(adapterExtensionGetFunction)
-                .StLoc(extensionMethodLocal)
-
-            // Execute extension function.
-                .MarkLabel(extensionExecute)
-
-                .Nop()
-                .LdLoc(extensionMethodLocal)
-                .LdLoc(sourceLocal)
-                .CallVirt(extensionExecuteMethod)
-                .StLoc(destinationLocal)
-
-                .MarkLabel(afterExecute);
-*/
 
             return methodIL;
         }
@@ -462,6 +393,7 @@ namespace AutoAdapter.Reflection
                     argIndex++;
                 }
 
+                // Does the parameter have and an adapter extension applied?
                 AdapterExtensionAttribute paramAttr = parameters[i].GetCustomAttribute<AdapterExtensionAttribute>();
                 if (paramAttr != null)
                 {
@@ -489,6 +421,7 @@ namespace AutoAdapter.Reflection
                     if (parameters[i].ParameterType != proxiedParameters[i].ParameterType &&
                         parameters[i].ParameterType.IsInterface == true)
                     {
+                        // TODO: Create an adapter?
                         methodIL.EmitGetAdaptedObject(parmValue);
                     }
                     else
@@ -514,41 +447,34 @@ namespace AutoAdapter.Reflection
                         methodIL.Emit(OpCodes.Ldloc_S, parmValue);
                     }
                 }
-                else
+                else if (parameters[i].ParameterType != proxiedParameters[i].ParameterType)
                 {
-                    if (parameters[i].ParameterType != proxiedParameters[i].ParameterType)
+                    // The parameter types do not match so we need to convert the parameter
+
+                    // Is the parameter an interface?
+                    if (parameters[i].ParameterType.IsInterface == true)
                     {
-                        if (parameters[i].ParameterType.IsInterface == true)
-                        {
-                            LocalBuilder parmValue = methodIL.DeclareLocal(parameters[i].ParameterType);
+                        LocalBuilder parmValue = methodIL.DeclareLocal(parameters[i].ParameterType);
 
-                            methodIL.Emit(OpCodes.Ldarg, argIndex);
-                            methodIL.Emit(OpCodes.Stloc_S, parmValue);
-                            methodIL.EmitGetAdaptedObject(parmValue);
-                        }
-                        else if (parameters[i].ParameterType.IsEnum == true)
-                        {
-                            methodIL.Emit(OpCodes.Ldarg, argIndex);
-                            methodIL.Emit(OpCodes.Conv_I4);
-                        }
-                        else
-                        {
-                            methodIL.Emit(OpCodes.Ldnull);
-
-                            /*
-                            Type type = TypeFactory.GetType("Omnibus.Config.ConfigIOObjectData", false);
-
-                            LocalBuilder parmValue = methodIL.DeclareLocal(type);
-                            methodIL.Emit(OpCodes.Ldloca_S, parmValue);
-                            methodIL.Emit(OpCodes.Initobj, type);
-                            methodIL.Emit(OpCodes.sti, parmValue);
-                            */
-                        }
+                        methodIL.Emit(OpCodes.Ldarg, argIndex);
+                        methodIL.Emit(OpCodes.Stloc_S, parmValue);
+                        methodIL.EmitGetAdaptedObject(parmValue);
+                    }
+                    else if (parameters[i].ParameterType.IsEnum == true)
+                    {
+                        // Load the argument and convert it
+                        methodIL.Emit(OpCodes.Ldarg, argIndex);
+                        methodIL.EmitConv(parameters[i].ParameterType, proxiedParameters[i].ParameterType, false);
+                        //methodIL.Emit(OpCodes.Conv_I4);
                     }
                     else
                     {
-                        methodIL.Emit(OpCodes.Ldarg, argIndex);
+                        methodIL.Emit(OpCodes.Ldnull);
                     }
+                }
+                else
+                {
+                    methodIL.Emit(OpCodes.Ldarg, argIndex);
                 }
             }
 
