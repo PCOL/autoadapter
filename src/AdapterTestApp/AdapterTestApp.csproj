@@ -1,0 +1,23 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <VersionPrefix>1.0.0-alpha-001</VersionPrefix>
+    <TargetFramework>netcoreapp2.0</TargetFramework>
+    <DebugType>portable</DebugType>
+    <AssemblyName>AdapterTestApp</AssemblyName>
+    <OutputType>Exe</OutputType>
+    <PackageId>AdapterTestApp</PackageId>
+    <RuntimeFrameworkVersion>2.0.0</RuntimeFrameworkVersion>
+    <!-- <PackageTargetFallback>$(PackageTargetFallback);dnxcore50</PackageTargetFallback> -->
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../AutoAdapter/AutoAdapter.csproj" />
+    <Content Include="AdaptedChildObject.cs" />
+    <Content Include="AdaptedTestObject.cs" />
+    <Content Include="IAdapted1.cs" />
+    <Content Include="IAdaptedChild1.cs" />
+    <Content Include="ITest.cs" />
+    <Content Include="Program.cs" />
+    <Content Include="Test.cs" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,23 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netcoreapp2.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.3.0-preview-20170628-02" />
+    <PackageReference Include="xunit" Version="2.2.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.2.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\AutoAdapter\AutoAdapter.csproj" />
+    <Content Include="AutoAdapterTests.cs" />
+    <Content Include="TypeFactoryTests.cs" />
+    <Content Include="Resources\IPropertyTestAdapter.cs" />
+    <Content Include="Resources\PropertyTest.cs" />
+    <Content Include="DynamicObjectAdapterTests.cs" />
+    <Content Include="Resources\TestDynamicObject.cs" />
+    <Content Include="Resources\IIndexPropertyAdapter.cs" />
+    <Content Include="Resources\IndexProperty.cs" />
+  </ItemGroup>
+</Project>
