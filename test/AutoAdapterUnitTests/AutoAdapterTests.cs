@@ -1,5 +1,6 @@
 using System;
 using AutoAdapter;
+using AutoAdapter.Reflection;
 using AutoAdapterUnitTests.Resources;
 using Xunit;
 
@@ -8,12 +9,12 @@ namespace AutoAdapterUnitTests
     public class AutoAdapterUnitTests
     {
         [Fact]
-        public void CreateITestAdapter_FromTestType_GetPropertyTest()
+        public void CreateIPropertyAdapter_FromPropertyAdaptee()
         {
             var testDateTime = DateTime.Now;
             var testGuid = Guid.NewGuid();
 
-            var testObject = new PropertyTest()
+            var testObject = new PropertyAdaptee()
             {
                 StringProperty = "Test",
                 Int16Property = 20000,
@@ -26,7 +27,7 @@ namespace AutoAdapterUnitTests
                 GuidProperty = testGuid
             };
 
-            var testAdapter = testObject.CreateAdapter<IPropertyTestAdapter>();
+            var testAdapter = testObject.CreateAdapter<IPropertyAdapter>();
 
             Assert.NotNull(testAdapter);
             Assert.Equal("Test", testAdapter.StringProperty);
@@ -41,45 +42,44 @@ namespace AutoAdapterUnitTests
         }
 
         [Fact]
-        public void CreateITestAdapter_FromTestType_SetPropertyTest()
+        public void CreateIPropertyAdapter_FromStaticPropertyAdaptee()
         {
             var testDateTime = DateTime.Now;
             var testGuid = Guid.NewGuid();
 
-            var testObject = new PropertyTest();
+            StaticPropertyAdaptee.StringProperty = "Test";
+            StaticPropertyAdaptee.Int16Property = 20000;
+            StaticPropertyAdaptee.Int32Property = 2000000;
+            StaticPropertyAdaptee.Int64Property = 200000000;
+            StaticPropertyAdaptee.FloatProperty = 3.14F;
+            StaticPropertyAdaptee.DoubleProperty = 3.14;
+            StaticPropertyAdaptee.BooleanProperty = true;
+            StaticPropertyAdaptee.DateTimeProperty = testDateTime;
+            StaticPropertyAdaptee.GuidProperty = testGuid;
 
-            var testAdapter = testObject.CreateAdapter<IPropertyTestAdapter>();
+            var testAdapterType = typeof(StaticPropertyAdaptee).CreateAdapterType<IStaticPropertyAdapter>();
+            var testAdapter = Activator.CreateInstance(testAdapterType, new object[] { null, null }) as IStaticPropertyAdapter;
 
             Assert.NotNull(testAdapter);
 
-            testAdapter.StringProperty = "Test";
-            testAdapter.Int16Property = 20000;
-            testAdapter.Int32Property = 2000000;
-            testAdapter.Int64Property = 200000000;
-            testAdapter.FloatProperty = 3.14F;
-            testAdapter.DoubleProperty = 3.14;
-            testAdapter.BooleanProperty = true;
-            testAdapter.DateTimeProperty = testDateTime;
-            testAdapter.GuidProperty = testGuid;
-
-            Assert.Equal("Test", testObject.StringProperty);
-            Assert.Equal(20000, testObject.Int16Property);
-            Assert.Equal(2000000, testObject.Int32Property);
-            Assert.Equal(200000000, testObject.Int64Property);
-            Assert.Equal(3.14F, testObject.FloatProperty);
-            Assert.Equal(3.14, testObject.DoubleProperty);
-            Assert.Equal(true, testObject.BooleanProperty);
-            Assert.Equal(testDateTime, testObject.DateTimeProperty);
-            Assert.Equal(testGuid, testObject.GuidProperty);
+            Assert.Equal("Test", testAdapter.StringProperty);
+            Assert.Equal(20000, testAdapter.Int16Property);
+            Assert.Equal(2000000, testAdapter.Int32Property);
+            Assert.Equal(200000000, testAdapter.Int64Property);
+            Assert.Equal(3.14F, testAdapter.FloatProperty);
+            Assert.Equal(3.14, testAdapter.DoubleProperty);
+            Assert.Equal(true, testAdapter.BooleanProperty);
+            Assert.Equal(testDateTime, testAdapter.DateTimeProperty);
+            Assert.Equal(testGuid, testAdapter.GuidProperty);
         }
 
         [Fact]
-        public void CreateIIndexPropertyAdapter_FromTestType_Success()
+        public void CreateIIndexPropertyAdapter_FromIndexPropertyAdaptee()
         {
             var testDateTime = DateTime.Now;
             var testGuid = Guid.NewGuid();
 
-            var testIndexObject = new IndexProperty(5);
+            var testIndexObject = new IndexPropertyAdaptee(5);
 
             testIndexObject[1] = "Test";
             testIndexObject[1, 100] = 200;

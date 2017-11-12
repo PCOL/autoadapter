@@ -24,6 +24,8 @@ SOFTWARE.
 
 namespace AutoAdapter.Reflection
 {
+    using System;
+    using System.Linq;
     using System.Reflection;
     using System.Reflection.Emit;
 
@@ -116,6 +118,35 @@ namespace AutoAdapter.Reflection
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Gets the property for a property method.
+        /// </summary>
+        /// <param name="methodInfo">A <see cref="MethodInfo"/>.</param>
+        /// <returns>A <see cref="PropertyInfo"/> if found; otherwise null.</returns>
+        public static PropertyInfo GetProperty(this MethodInfo methodInfo)
+        {
+            Type[] types = Type.EmptyTypes;
+            Type returnType = methodInfo.ReturnType;
+            var parms = methodInfo.GetParameters();
+            if (parms.Length > 0)
+            {
+                var parmTypes = parms.Select(p => p.ParameterType);
+
+                if (methodInfo.IsPropertySet() == true)
+                {
+                    returnType = parmTypes.Last();
+                    parmTypes = parmTypes.Take(parms.Length - 1);
+                }
+
+                types = parmTypes.ToArray();
+            }
+
+            return methodInfo.DeclaringType.GetProperty(
+                methodInfo.Name.Substring(4),
+                returnType,
+                types);
         }
 
         /// <summary>

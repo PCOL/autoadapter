@@ -2,7 +2,7 @@ namespace AutoAdapterUnitTests
 {
     using System;
 
-    public interface IPropertyTestAdapter
+    public interface IPropertyAdapter
     {
         string StringProperty { get; set; }
 

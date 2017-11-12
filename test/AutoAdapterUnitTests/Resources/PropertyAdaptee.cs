@@ -2,7 +2,7 @@ namespace AutoAdapterUnitTests.Resources
 {
     using System;
 
-    public class PropertyTest
+    public class PropertyAdaptee
     {
         public string StringProperty { get; set; }
 

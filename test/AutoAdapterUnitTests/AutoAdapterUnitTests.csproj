@@ -13,11 +13,14 @@
     <ProjectReference Include="..\..\src\AutoAdapter\AutoAdapter.csproj" />
     <Content Include="AutoAdapterTests.cs" />
     <Content Include="TypeFactoryTests.cs" />
-    <Content Include="Resources\IPropertyTestAdapter.cs" />
-    <Content Include="Resources\PropertyTest.cs" />
     <Content Include="DynamicObjectAdapterTests.cs" />
-    <Content Include="Resources\TestDynamicObject.cs" />
     <Content Include="Resources\IIndexPropertyAdapter.cs" />
-    <Content Include="Resources\IndexProperty.cs" />
+    <Content Include="Resources\PropertyAdaptee.cs" />
+    <Content Include="Resources\IndexPropertyAdaptee.cs" />
+    <Content Include="Resources\DynamicObjectAdaptee.cs" />
+    <Content Include="Resources\StaticPropertyAdaptee.cs" />
+    <Content Include="Resources\IPropertyAdapter.cs" />
+    <Content Include="Resources\IPropertyAdapter.1.cs" />
+    <Content Include="Resources\IStaticPropertyAdapter.cs" />
   </ItemGroup>
 </Project>

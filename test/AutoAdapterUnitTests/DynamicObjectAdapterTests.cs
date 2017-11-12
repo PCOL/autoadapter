@@ -20,9 +20,9 @@ namespace AutoAdapterUnitTests
             services.AddSingleton<IAdapterFactoryExtension>(new DynamicObjectAdapterFactoryExtension());
             var serviceProvider = services.BuildServiceProvider();
 
-            var dynamicObj = new TestDynamicObject();
+            var dynamicObj = new DynamicObjectAdaptee();
 
-            var dynamicObjAdapter = dynamicObj.CreateAdapter<IPropertyTestAdapter>(serviceProvider);
+            var dynamicObjAdapter = dynamicObj.CreateAdapter<IPropertyAdapter>(serviceProvider);
             dynamicObjAdapter.StringProperty = "Test";
             dynamicObjAdapter.Int16Property = 20000;
             dynamicObjAdapter.Int32Property = 2000000;
@@ -54,7 +54,7 @@ namespace AutoAdapterUnitTests
             services.AddSingleton<IAdapterFactoryExtension>(new DynamicObjectAdapterFactoryExtension());
             var serviceProvider = services.BuildServiceProvider();
 
-            var dynamicObj = new TestDynamicObject();
+            var dynamicObj = new DynamicObjectAdaptee();
 
             var dynamicObjAdapter = dynamicObj.CreateAdapter<IIndexPropertyAdapter>(serviceProvider);
             dynamicObjAdapter[0] = "Test";

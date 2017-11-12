@@ -2,13 +2,13 @@ namespace AutoAdapterUnitTests.Resources
 {
     using System.Collections.Generic;
 
-    public class IndexProperty
+    public class IndexPropertyAdaptee
     {
         private string[] values;
 
         private Dictionary<string, short> shortValues = new Dictionary<string, short>();
 
-        public IndexProperty(int count)
+        public IndexPropertyAdaptee(int count)
         {
             this.values = new string[count];
         }

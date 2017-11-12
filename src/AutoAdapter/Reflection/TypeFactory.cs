@@ -96,14 +96,8 @@ namespace AutoAdapter.Reflection
         /// <returns>A <see cref="Type"/> representing the type if found; otherwise null.</returns>
         public Type GetType(string typeName, bool dynamicOnly)
         {
-//Console.WriteLine("TypeName: {0} - {1}", typeName, dynamicOnly);
-
             var list = this.assemblyCache.GetAssemblies()
                 .Union(AssemblyCache.GetAssemblies()).ToArray();
-
-// Console.WriteLine("=======================");
-// Console.WriteLine("Assembly Count: {0}", list.Count());
-// Console.WriteLine("=======================");
 
             foreach (var ass in list)
             {
@@ -113,7 +107,6 @@ namespace AutoAdapter.Reflection
                     Type type = ass.GetType(typeName);
                     if (type != null)
                     {
-//Console.WriteLine("Found");
                         return type;
                     }
                 }

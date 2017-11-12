@@ -5,14 +5,14 @@ namespace AutoAdapterUnitTests.Resources
     using System.Dynamic;
     using System.Linq;
 
-    public class TestDynamicObject
+    public class DynamicObjectAdaptee
         : DynamicObject
     {
         private Dictionary<string, object> properties = new Dictionary<string, object>();
 
         private Dictionary<string, object> indexProperties = new Dictionary<string, object>();
 
-        public TestDynamicObject()
+        public DynamicObjectAdaptee()
         {
         }
 
