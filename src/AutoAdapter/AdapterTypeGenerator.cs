@@ -440,60 +440,21 @@ namespace AutoAdapter
                 if (memberInfo.MemberType == MemberTypes.Method)
                 {
                     MethodInfo methodInfo = (MethodInfo)memberInfo;
-                    ParameterInfo[] parameters = methodInfo.GetParameters();
-                    Type[] methodArgs = parameters.Select(p => p.ParameterType).ToArray();
+                    MethodBuilder methodBuilder = null;
 
                     if (methodInfo.ContainsGenericParameters == true)
                     {
-                        this.BuildGenericMethod(
-                            context,
-                            methodInfo,
-                            parameters,
-                            methodArgs);
+                        methodBuilder = this.BuildGenericMethod(context, methodInfo);
                     }
                     else
                     {
-                        MethodAttributes attrs = methodInfo.Attributes & ~MethodAttributes.Abstract;
-                        var methodBuilder = context
-                            .TypeBuilder
-                            .DefineMethod(
-                                methodInfo.Name,
-                                attrs | MethodAttributes.Virtual,
-                                methodInfo.ReturnType,
-                                methodArgs);
+                        methodBuilder = this.BuildMethod(context, methodInfo);
+                    }
 
-                        var methodIL = methodBuilder.GetILGenerator();
-
-                        bool implemented = false;
-                        IServiceProvider scope = context.ServiceProvider;
-                        if (scope != null)
-                        {
-                            foreach (var extension in scope.GetServices<IAdapterFactoryExtension>())
-                            {
-                                if (extension.ImplementMethod(methodInfo, methodIL, context) == true)
-                                {
-                                    implemented = true;
-                                    break;
-                                }
-                            }
-                        }
-
-                        if (implemented == false)
-                        {
-                            this.GetMethodTargetDetails(methodInfo, context);
-
-                            this.BuildMethod(
-                                context,
-                                methodInfo,
-                                methodIL,
-                                methodArgs);
-
-                            if (methodInfo.IsProperty() == true)
-                            {
-                                var propertyId = $"{methodInfo.Name}_{methodInfo.GetParameters().Length}";
-                                propertyMethods.Add(propertyId, methodBuilder);
-                            }
-                        }
+                    if (methodInfo.IsProperty() == true)
+                    {
+                        var propertyId = $"{methodInfo.Name}_{methodInfo.GetParameters().Length}";
+                        propertyMethods.Add(propertyId, methodBuilder);
                     }
                 }
                 else if (memberInfo.MemberType == MemberTypes.Property)
@@ -646,10 +607,10 @@ namespace AutoAdapter
         /// </summary>
         /// <param name="context">The current <see cref="AdapterContext"/.></param>
         /// <param name="methodInfo">The current <see cref="MethodInfo"/>.</param>
-        /// <param name="parameters">The current methods parameters.</param>
-        /// <param name="methodArgs">The current methods argument types.</param>
-        private void BuildGenericMethod(AdapterContext context, MethodInfo methodInfo, ParameterInfo[] parameters, Type[] methodArgs)
+        private MethodBuilder BuildGenericMethod(AdapterContext context, MethodInfo methodInfo)
         {
+            ParameterInfo[] parameters = methodInfo.GetParameters();
+            Type[] methodArgs = parameters.Select(p => p.ParameterType).ToArray();
             Type[] genericArguments = methodInfo.GetGenericArguments();
 
             MethodBuilder methodBuilder =
@@ -674,6 +635,23 @@ namespace AutoAdapter
 
             ILGenerator methodIL = methodBuilder.GetILGenerator();
 
+            this.BuildGenericMethod(
+                context,
+                methodInfo,
+                methodIL,
+                genericArguments,
+                parameters);
+
+            return methodBuilder;
+        }
+
+        private void BuildGenericMethod(
+            AdapterContext context,
+            MethodInfo methodInfo,
+            ILGenerator methodIL,
+            Type[] genericArguments,
+            ParameterInfo[] parameters)
+        {
             MethodInfo proxiedMethod = context.BaseType.GetSimilarMethod(methodInfo);
             if (proxiedMethod == null)
             {
@@ -865,6 +843,62 @@ namespace AutoAdapter
 
             //methodIL.Emit(OpCodes.Ldnull);
             methodIL.Emit(OpCodes.Ret);
+        }
+
+        /// <summary>
+        /// Builds a method
+        /// </summary>
+        /// <param name="context"></param>
+        /// <param name="methodInfo"></param>
+        /// <param name="propertyMethods"></param>
+        private MethodBuilder BuildMethod(AdapterContext context, MethodInfo methodInfo)
+        {
+            ParameterInfo[] parameters = methodInfo.GetParameters();
+            Type[] methodArgs = parameters.Select(p => p.ParameterType).ToArray();
+
+            MethodAttributes attrs = methodInfo.Attributes & ~MethodAttributes.Abstract;
+            var methodBuilder = context
+                .TypeBuilder
+                .DefineMethod(
+                    methodInfo.Name,
+                    attrs | MethodAttributes.Virtual,
+                    methodInfo.ReturnType,
+                    methodArgs);
+
+            var methodIL = methodBuilder.GetILGenerator();
+
+            bool implemented = false;
+            IServiceProvider scope = context.ServiceProvider;
+            if (scope != null)
+            {
+                foreach (var extension in scope.GetServices<IAdapterFactoryExtension>())
+                {
+                    if (extension.ImplementMethod(methodInfo, methodIL, context) == true)
+                    {
+                        implemented = true;
+                        break;
+                    }
+                }
+            }
+
+            if (implemented == false)
+            {
+                this.GetMethodTargetDetails(methodInfo, context);
+
+                this.BuildMethod(
+                    context,
+                    methodInfo,
+                    methodIL,
+                    methodArgs);
+
+                // if (methodInfo.IsProperty() == true)
+                // {
+                //     var propertyId = $"{methodInfo.Name}_{methodInfo.GetParameters().Length}";
+                //     propertyMethods.Add(propertyId, methodBuilder);
+                // }
+            }
+
+            return methodBuilder;
         }
 
         /// <summary>
