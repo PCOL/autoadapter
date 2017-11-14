@@ -273,7 +273,6 @@ namespace AutoAdapter
 
             MethodInfo dictionaryTryGetValue = typeof(Dictionary<string, IAdapterExtension>).GetMethod("TryGetValue");
             MethodInfo adapterExtensionGetArg = typeof(IAdapterExtension).GetMethod("get_ArgumentType");
-            MethodInfo typeGetTypeFromHandle = typeof(Type).GetMethod("GetTypeFromHandle");
             MethodInfo typeOpEquality = typeof(Type).GetMethod("op_Equality");
             MethodInfo adapterExtensionGetReturnType = typeof(IAdapterExtension).GetMethod("get_ReturnType");
 
@@ -293,25 +292,18 @@ namespace AutoAdapter
             methodIL.Emit(OpCodes.Ldloc_1);
             methodIL.Emit(OpCodes.Brfalse_S, nullResult);
 
-                // .StLocS(tryGetResult)
-                // .LdLoc1()
-                // .BrFalseS(nullResult)
-
             methodIL.Emit(OpCodes.Nop);
             methodIL.Emit(OpCodes.Ldloc_S, extension);
             methodIL.Emit(OpCodes.Callvirt, adapterExtensionGetArg);
 
-            methodIL.Emit(OpCodes.Ldtoken, genericT.AsType());
-            methodIL.Emit(OpCodes.Call, typeGetTypeFromHandle);
+            methodIL.EmitTypeOf(genericT.AsType());
             methodIL.Emit(OpCodes.Call, typeOpEquality);
             methodIL.Emit(OpCodes.Brfalse_S, nullResult);
 
             methodIL.Emit(OpCodes.Ldloc_S, tryGetResult);
             methodIL.Emit(OpCodes.Callvirt, adapterExtensionGetReturnType);
 
-            methodIL.Emit(OpCodes.Ldtoken, genericTResult.AsType());
-            methodIL.Emit(OpCodes.Call, typeGetTypeFromHandle);
-
+            methodIL.EmitTypeOf(genericTResult.AsType());
             methodIL.Emit(OpCodes.Call, typeOpEquality);
             methodIL.Emit(OpCodes.Brfalse_S, nullResult);
 
@@ -473,7 +465,10 @@ namespace AutoAdapter
         /// <param name="context">An <see cref="AdapterContext"/>.</param>
         /// <param name="propertyInfo">A <see cref="PropertyInfo"/>.</param>
         /// <param name="propertyMethods">A dictionary of property method implementations.</param>
-        private void DefineProperty(AdapterContext context, PropertyInfo propertyInfo, IDictionary<string, MethodBuilder> propertyMethods)
+        private void DefineProperty(
+            AdapterContext context,
+            PropertyInfo propertyInfo,
+            IDictionary<string, MethodBuilder> propertyMethods)
         {
             this.GetPropertyTargetDetails(propertyInfo, context);
 
@@ -526,7 +521,12 @@ namespace AutoAdapter
             TargetMemberType targetMemberType;
             Type targetStaticType;
             Type targetType;
-            string attrTargetName = this.GetMemberTargetName(propertyInfo.GetCustomAttribute<AdapterImplAttribute>(), out targetStaticType, out targetMemberType, out targetType);
+            string attrTargetName = this.GetMemberTargetName(
+                propertyInfo.GetCustomAttribute<AdapterImplAttribute>(),
+                out targetStaticType,
+                out targetMemberType,
+                out targetType);
+
             if (targetMemberType == TargetMemberType.Property ||
                 targetMemberType == TargetMemberType.NotSet)
             {
@@ -645,6 +645,14 @@ namespace AutoAdapter
             return methodBuilder;
         }
 
+        /// <summary>
+        /// Builds a generic method.
+        /// </summary>
+        /// <param name="context">The current <see cref="AdapterContext"/.></param>
+        /// <param name="methodInfo">The current <see cref="MethodInfo"/>.</param>
+        /// <param name="methodIL">The methods <see cref="ILGenerator"/>.</param>
+        /// <param name="genericArguments">The methods generic arguments.</param>
+        /// <param name="parameters">The methods parameters.</param>
         private void BuildGenericMethod(
             AdapterContext context,
             MethodInfo methodInfo,
@@ -848,9 +856,8 @@ namespace AutoAdapter
         /// <summary>
         /// Builds a method
         /// </summary>
-        /// <param name="context"></param>
-        /// <param name="methodInfo"></param>
-        /// <param name="propertyMethods"></param>
+        /// <param name="context">The current <see cref="AdapterContext"/.></param>
+        /// <param name="methodInfo">The current <see cref="MethodInfo"/>.</param>
         private MethodBuilder BuildMethod(AdapterContext context, MethodInfo methodInfo)
         {
             ParameterInfo[] parameters = methodInfo.GetParameters();
@@ -890,12 +897,6 @@ namespace AutoAdapter
                     methodInfo,
                     methodIL,
                     methodArgs);
-
-                // if (methodInfo.IsProperty() == true)
-                // {
-                //     var propertyId = $"{methodInfo.Name}_{methodInfo.GetParameters().Length}";
-                //     propertyMethods.Add(propertyId, methodBuilder);
-                // }
             }
 
             return methodBuilder;
