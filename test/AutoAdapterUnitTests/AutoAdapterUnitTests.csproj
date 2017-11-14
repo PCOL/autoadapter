@@ -22,5 +22,9 @@
     <Content Include="Resources\IPropertyAdapter.cs" />
     <Content Include="Resources\IPropertyAdapter.1.cs" />
     <Content Include="Resources\IStaticPropertyAdapter.cs" />
+    <Content Include="Resources\ApmAdpatee.cs" />
+    <Content Include="Resources\IApmAdapter.cs" />
+    <Content Include="Resources\ITaskApmAdpater.cs" />
+    <Content Include="ApmAdapterTests.cs" />
   </ItemGroup>
 </Project>

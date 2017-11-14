@@ -54,7 +54,7 @@
 
                 MethodInfo proxiedEndMethod = this.GetAsyncMethod(
                     context.BaseType,
-                    $"Begin{methodInfo.Name}",
+                    $"End{methodInfo.Name}",
                     BindingFlags.Public | BindingFlags.Instance,
                     new Type[] { typeof(IAsyncResult) });
 
@@ -123,7 +123,23 @@
             return false;
         }
 
-        private Type GetReturnTypeArgumentTypesAndMethodTypes(MethodInfo methodInfo, ParameterInfo[] parameters, out Type[] argTypes, out Type beginMethodFuncType, out Type endMethodFuncType, out MethodInfo taskFactoryMethod)
+        /// <summary>
+        /// Gets the return type, argument types, and method types.
+        /// </summary>
+        /// <param name="methodInfo">The <see cref="MethodInfo"/>.</param>
+        /// <param name="parameters">The methods parameters.</param>
+        /// <param name="argTypes">A variable to receive the arguemnt types.</param>
+        /// <param name="beginMethodFuncType">A variable to receive the begin method <see cref="Func"/> type.</param>
+        /// <param name="endMethodFuncType">A variable to receive the end method <see cref="Func"/> type.</param>
+        /// <param name="taskFactoryMethod">A variable to receive the <see cref="TaskFactory"/> method.</param>
+        /// <returns></returns>
+        private Type GetReturnTypeArgumentTypesAndMethodTypes(
+            MethodInfo methodInfo,
+            ParameterInfo[] parameters,
+            out Type[] argTypes,
+            out Type beginMethodFuncType,
+            out Type endMethodFuncType,
+            out MethodInfo taskFactoryMethod)
         {
             Type returnType = methodInfo.ReturnType.GetGenericArguments()[0];
             argTypes = new Type[parameters.Length];
@@ -132,47 +148,6 @@
                 argTypes[i] = parameters[i].ParameterType;
             }
 
-/*
-            Type taskFactoryType = typeof(TaskFactory<>).MakeGenericType(returnType);
-            endMethodFuncType = typeof(Func<,>).MakeGenericType(typeof(IAsyncResult), returnType);
-
-            if (argTypes.Length == 1)
-            {
-                beginMethodFuncType = typeof(Func<,,,>).MakeGenericType(argTypes[0], typeof(AsyncCallback), typeof(object), typeof(IAsyncResult));
-                taskFactoryMethod = taskFactoryType.GetMethodWithParameters(
-                    "FromAsync",
-                    new Type[]
-                    {
-                        beginMethodFuncType,
-                        endMethodFuncType,
-                        argTypes[0],
-                        typeof(object)
-                    }).MakeGenericMethod(argTypes);
-            }
-            else if (argTypes.Length == 2)
-            {
-                beginMethodFuncType = typeof(Func<,,,,>).MakeGenericType(argTypes[0], argTypes[1], typeof(AsyncCallback), typeof(object), typeof(IAsyncResult));
-                taskFactoryMethod = taskFactoryType.GetMethodWithParameters(
-                    "FromAsync",
-                    new Type[]
-                    {
-                        beginMethodFuncType,
-                        endMethodFuncType,
-                        argTypes[0],
-                        argTypes[1],
-                        typeof(object)
-                    }).MakeGenericMethod(argTypes);
-            }
-            else if (argTypes.Length == 3)
-            {
-                beginMethodFuncType = typeof(Func<,,,,,>).MakeGenericType(argTypes[0], argTypes[1], argTypes[2], typeof(AsyncCallback), typeof(object), typeof(IAsyncResult));
-                taskFactoryMethod = taskFactoryType.GetMethodWithParameters("FromAsync", new Type[] { beginMethodFuncType, endMethodFuncType, argTypes[0], argTypes[1], argTypes[2], typeof(object) }).MakeGenericMethod(argTypes);
-            }
-            else
-            {
-                throw new AdapterGenerationException("Too many generic args");
-            }
-*/
             if (argTypes.Length > 3)
             {
                 throw new AdapterGenerationException("Too many generic args");
@@ -189,6 +164,15 @@
             return taskFactoryType;
         }
 
+        /// <summary>
+        /// Builds the <see cref="taskFactory"/> and begin and end <see cref="Func"/> types.
+        /// </summary>
+        /// <param name="returnType">The return type.</param>
+        /// <param name="beginFuncType">A variable to receive the begin <see cref="Func"/> type.</param>
+        /// <param name="endFuncType">A variable to receive the end <see cref="Func"/> type.</param>
+        /// <param name="taskFactoryType">A variable the receive the <see cref="TaskFactory"/> type.</param>
+        /// <param name="argTypes">The argument types.</param>
+        /// <returns>The <see cref="TaskFactory"/> <see cref="MethodInfo"/>.</returns>
         public MethodInfo MakeTaskFactoryMethodAndBeginEndFuncTypes(Type returnType, out Type beginFuncType, out Type endFuncType, out Type taskFactoryType, params Type[] argTypes)
         {
             taskFactoryType = typeof(TaskFactory<>).MakeGenericType(returnType);
@@ -218,6 +202,14 @@
             return taskFactoryMethod;
         }
 
+        /// <summary>
+        /// Gets an async method.
+        /// </summary>
+        /// <param name="proxiedType">The proxied type.</param>
+        /// <param name="methodName">The method name.</param>
+        /// <param name="bindingFlags">The binding flags.</param>
+        /// <param name="parameterTypes">The methods parameter types.</param>
+        /// <returns></returns>
         private MethodInfo GetAsyncMethod(Type proxiedType, string methodName, BindingFlags bindingFlags, Type[] parameterTypes)
         {
             MethodInfo proxiedMethod = proxiedType.GetMethodWithParameters(methodName, bindingFlags, parameterTypes);
