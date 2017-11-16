@@ -754,5 +754,99 @@ namespace AutoAdapter.Reflection
 
             return ilGen;
         }
+
+        /// <summary>
+        /// Emits IL to check if the object on the top of the evaluation stack is not null, executing the emitted body if not.
+        /// </summary>
+        /// <param name="ilGen">The <see cref="ILGenerator"/> to use.</param>
+        /// <param name="emitBody">A function to emit the IL to be executed if the object is not null.</param>
+        /// <param name="emitElse">A function to emit the IL to be executed if the object is null.</param>
+        public static ILGenerator EmitIfNotNull(
+            this ILGenerator ilGen,
+            Action emitBody,
+            Action emitElse = null)
+        {
+            Label endIf = ilGen.DefineLabel();
+
+            if (emitElse != null)
+            {
+                Label notNull = ilGen.DefineLabel();
+                ilGen.Emit(OpCodes.Brtrue, notNull);
+                ilGen.Emit(OpCodes.Nop);
+                emitElse();
+                ilGen.Emit(OpCodes.Br, endIf);
+                ilGen.MarkLabel(notNull);
+            }
+            else
+            {
+                ilGen.Emit(OpCodes.Brfalse, endIf);
+            }
+
+            emitBody();
+            ilGen.MarkLabel(endIf);
+
+            return ilGen;
+        }
+
+        /// <summary>
+        /// Emits IL to perform a for loop over an array.
+        /// </summary>
+        /// <param name="ilGen">An IL generator.</param>
+        /// <param name="localArray">The local variable holding the array.</param>
+        /// <param name="action">An action to allow the injecting of the loop code.</param>
+        public static ILGenerator EmitFor(this ILGenerator ilGen, LocalBuilder localArray, Action<LocalBuilder> action)
+        {
+            Label beginLoop = ilGen.DefineLabel();
+            Label loopCheck = ilGen.DefineLabel();
+
+            LocalBuilder index = ilGen.DeclareLocal(typeof(int));
+
+            ilGen.Emit(OpCodes.Ldc_I4_0);
+            ilGen.Emit(OpCodes.Stloc_S, index);
+            ilGen.Emit(OpCodes.Br, loopCheck);
+            ilGen.MarkLabel(beginLoop);
+
+            ilGen.Emit(OpCodes.Ldloc, localArray);
+            ilGen.Emit(OpCodes.Ldloc, index);
+
+            action(index);
+
+            ilGen.Emit(OpCodes.Nop);
+            ilGen.Emit(OpCodes.Ldloc, index);
+            ilGen.Emit(OpCodes.Ldc_I4_1);
+            ilGen.Emit(OpCodes.Add);
+            ilGen.Emit(OpCodes.Stloc_S, index);
+
+            ilGen.MarkLabel(loopCheck);
+            ilGen.Emit(OpCodes.Ldloc_S, index);
+            ilGen.Emit(OpCodes.Ldloc, localArray);
+            ilGen.Emit(OpCodes.Ldlen);
+            ilGen.Emit(OpCodes.Conv_I4);
+            ilGen.Emit(OpCodes.Blt_S, beginLoop);
+
+            return ilGen;
+        }
+
+        /// <summary>
+        /// Emits IL to perform a for loop over an array.
+        /// </summary>
+        /// <param name="ilGen">An IL generator.</param>
+        /// <param name="localArray">The local variable holding the array.</param>
+        /// <param name="action">An action to allow the injecting of the loop code.</param>
+        public static ILGenerator EmitFor(this ILGenerator ilGen, LocalBuilder localArray, Action<LocalBuilder, LocalBuilder> action)
+        {
+            LocalBuilder item = ilGen.DeclareLocal(localArray.LocalType.GetElementType());
+
+            return ilGen.EmitFor(
+                localArray,
+                (index) =>
+                {
+                    ilGen.Emit(OpCodes.Ldelem_Ref);
+                    ilGen.Emit(OpCodes.Stloc_S, item);
+                    ilGen.Emit(OpCodes.Nop);
+
+                    action(index, item);
+                });
+        }
     }
 }

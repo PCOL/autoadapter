@@ -26,6 +26,7 @@ namespace AutoAdapter
 {
     using System;
     using System.Linq;
+    using System.Reflection;
     using System.Reflection.Emit;
 
     /// <summary>
@@ -175,6 +176,26 @@ namespace AutoAdapter
         public bool DoesTypeBuilderImplementInterface(Type ifaceType)
         {
             return this.TypeBuilder.GetInterfaces().FirstOrDefault((type) => ifaceType == type) != null;
+        }
+
+        public ConstructorInfo GetAdapterConstructor(MethodInfo methodInfo)
+        {
+            ConstructorInfo adapterCtor = null;
+            if (this.DoesTypeBuilderImplementInterface(methodInfo.ReturnType) == true)
+            {
+                adapterCtor = this.ConstructorBuilder;
+            }
+            else
+            {
+                // We need to create a new adapted object.
+                Type adapterType = this.TargetType.CreateAdapterType(
+                    methodInfo.ReturnType,
+                    this.ServiceProvider);
+
+                adapterCtor = adapterType.GetConstructor(new Type[] { this.TargetType, typeof(IServiceProvider) });
+            }
+
+            return adapterCtor;
         }
     }
 }

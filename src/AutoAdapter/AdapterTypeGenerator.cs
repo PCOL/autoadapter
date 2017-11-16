@@ -65,9 +65,9 @@ namespace AutoAdapter
         /// <param name="adaptedType">The type being adpated.</param>
         /// <param name="adapterTypes">The adapter types.</param>
         /// <returns>The type name.</returns>
-        public static string TypeName(Type adaptedType, Type[] adapterTypes)
+        public static string TypeName(Type adaptedType, Type adapterType)
         {
-            return string.Format("Dynamic.Adapters.{0}_{1}", adaptedType.Name, adapterTypes.Join("_", (t) => { return t.Name; }));
+            return $"Dynamic.Adapters.{adaptedType.Name}_{adapterType.Name}";
         }
 
         /// <summary>
@@ -90,7 +90,7 @@ namespace AutoAdapter
         /// <returns>A new adapter type.</returns>
         public Type CreateAdapterType<T>(Type typeToAdapt, IServiceProvider serviceProvider)
         {
-            return this.CreateAdapterType(typeToAdapt, new Type[] { typeof(T) }, serviceProvider);
+            return this.CreateAdapterType(typeToAdapt, typeof(T), serviceProvider);
         }
 
         /// <summary>
@@ -118,7 +118,7 @@ namespace AutoAdapter
                 return default(T);
             }
 
-            return (T)this.CreateAdapterInternal(instance, new Type[] { typeof(T) }, serviceProvider);
+            return (T)this.CreateAdapterInternal(instance, typeof(T), serviceProvider);
         }
 
         /// <summary>
@@ -128,10 +128,10 @@ namespace AutoAdapter
         /// <param name="types">The interface types to implement on the adapter type.</param>
         /// <param name="serviceProvider">The dependency injection scope to use.</param>
         /// <returns>An instance of the adapter if valid; otherwise null.</returns>
-        private object CreateAdapterInternal(object inst, Type[] types, IServiceProvider serviceProvider)
+        private object CreateAdapterInternal(object inst, Type adapterType, IServiceProvider serviceProvider)
         {
-            Type adapterType = this.CreateAdapterType(inst.GetType(), types, serviceProvider);
-            return Activator.CreateInstance(adapterType, inst, serviceProvider);
+            Type newAdapterType = this.CreateAdapterType(inst.GetType(), adapterType, serviceProvider);
+            return Activator.CreateInstance(newAdapterType, inst, serviceProvider);
         }
 
         /// <summary>
@@ -141,26 +141,26 @@ namespace AutoAdapter
         /// <param name="adapterTypes">The interface types to implement on the adapter type.</param>
         /// <param name="serviceProvider">The dependency injection scope to use.</param>
         /// <returns>A <see cref="Type"/> representing the new adapter.</returns>
-        private Type CreateAdapterType(Type adaptedType, Type[] adapterTypes, IServiceProvider serviceProvider)
+        public Type CreateAdapterType(Type adaptedType, Type adapterType, IServiceProvider serviceProvider)
         {
-            string typeName = TypeName(adaptedType, adapterTypes);
-            Type adapterType = TypeFactory.Default.GetType(typeName, true);
-            if (adapterType == null)
+            string typeName = TypeName(adaptedType, adapterType);
+            Type newAdapterType = TypeFactory.Default.GetType(typeName, true);
+            if (newAdapterType == null)
             {
-                adapterType = this.GenerateAdapterType(adapterTypes, adaptedType, serviceProvider);
+                newAdapterType= this.GenerateAdapterType(adaptedType, adapterType, serviceProvider);
             }
 
-            return adapterType;
+            return newAdapterType;
         }
 
         /// <summary>
         /// Generates the adapter type.
         /// </summary>
-        /// <param name="adapterTypes">The adapters interface types to implement.</param>
         /// <param name="adaptedType">The type being adapted.</param>
+        /// <param name="adapterType">The adapters interface types to implement.</param>
         /// <param name="serviceProvider">The dependency injection scope to use.</param>
         /// <returns>A <see cref="Type"/> representing the new adapter.</returns>
-        private Type GenerateAdapterType(Type[] adapterTypes, Type adaptedType, IServiceProvider serviceProvider)
+        private Type GenerateAdapterType(Type adaptedType, Type adapterType, IServiceProvider serviceProvider)
         {
             TypeAttributes typeAttributes = TypeAttributes.Class | TypeAttributes.Public;
 
@@ -169,7 +169,7 @@ namespace AutoAdapter
                 .Default
                 .ModuleBuilder
                 .DefineType(
-                    TypeName(adaptedType, adapterTypes),
+                    TypeName(adaptedType, adapterType),
                     typeAttributes);
 
             FieldBuilder adaptedTypeField =
@@ -194,17 +194,14 @@ namespace AutoAdapter
                 adaptedType,
                 adaptedTypeField);
 
-            foreach (Type type in adapterTypes)
-            {
-                typeBuilder.AddInterfaceImplementation(type);
+            typeBuilder.AddInterfaceImplementation(adapterType);
 
-                Type[] implementedInterfaces = type.GetInterfaces();
-                if (implementedInterfaces != null)
+            Type[] implementedInterfaces = adapterType.GetInterfaces();
+            if (implementedInterfaces != null)
+            {
+                foreach (Type iface in implementedInterfaces)
                 {
-                    foreach (Type iface in implementedInterfaces)
-                    {
-                        typeBuilder.AddInterfaceImplementation(iface);
-                    }
+                    typeBuilder.AddInterfaceImplementation(iface);
                 }
             }
 
@@ -217,11 +214,8 @@ namespace AutoAdapter
 
             // Implement interfaces.
             AdapterContext context = new AdapterContext(typeBuilder, null, adaptedType, serviceProvider, adaptedTypeField, dependencyResolverField, ctorBuilder);
-            foreach (Type adapterType in adapterTypes)
-            {
-                context = context.CreateTypeFactoryContext(adapterType);
-                this.ImplementInterfaces(context);
-            }
+            context = context.CreateTypeFactoryContext(adapterType);
+            this.ImplementInterfaces(context);
 
             // Create the type.
             return typeBuilder.CreateTypeInfo().AsType();
@@ -1095,7 +1089,8 @@ namespace AutoAdapter
                     Type returnType = methodInfo.ReturnType.GetElementType();
                     Type proxiedType = proxiedReturnType.GetElementType();
 
-                    ConstructorInfo adapterCtor = null;
+                    ConstructorInfo adapterCtor = context.GetAdapterConstructor(methodInfo);
+/*
                     if (context.DoesTypeBuilderImplementInterface(returnType) == true)
                     {
                         adapterCtor = context.ConstructorBuilder;
@@ -1109,6 +1104,7 @@ namespace AutoAdapter
 
                         adapterCtor = adapterType.GetConstructor(new Type[] { proxiedType, typeof(IServiceProvider) });
                     }
+*/
 
                     Label labelStart = ilGen.DefineLabel();
                     Label loopStart = ilGen.DefineLabel();
@@ -1116,8 +1112,8 @@ namespace AutoAdapter
                     Label labelEnd = ilGen.DefineLabel();
 
                     LocalBuilder returnArray = ilGen.DeclareLocal(methodInfo.ReturnType);
-                    LocalBuilder index = ilGen.DeclareLocal<int>();
-                    LocalBuilder done = ilGen.DeclareLocal<bool>();
+                    //LocalBuilder index = ilGen.DeclareLocal<int>();
+                    //LocalBuilder done = ilGen.DeclareLocal<bool>();
 
                     // If null then exit...
                     ilGen.Emit(OpCodes.Brtrue_S, labelStart);
@@ -1133,6 +1129,20 @@ namespace AutoAdapter
                     ilGen.Emit(OpCodes.Newarr, returnType);
                     ilGen.Emit(OpCodes.Stloc_S, returnArray);
 
+                    ilGen.EmitFor(
+                        returnArray,
+                        (index) =>
+                        {
+                            ilGen.Emit(OpCodes.Ldloc_S, proxiedReturn);
+                            ilGen.Emit(OpCodes.Ldloc_S, index);
+                            ilGen.Emit(OpCodes.Ldelem_Ref);
+                            ilGen.Emit(OpCodes.Ldarg_0);
+                            ilGen.Emit(OpCodes.Ldfld, context.ServiceProviderField);
+                            ilGen.Emit(OpCodes.Newobj, adapterCtor);
+                            ilGen.Emit(OpCodes.Stelem_Ref);
+                        });
+
+/*
                     ilGen.Emit(OpCodes.Ldc_I4_0);
                     ilGen.Emit(OpCodes.Stloc_S, index);
                     ilGen.Emit(OpCodes.Br_S, loopCheck);
@@ -1165,6 +1175,8 @@ namespace AutoAdapter
 
                     ilGen.Emit(OpCodes.Ldloc_S, done);
                     ilGen.Emit(OpCodes.Brtrue_S, loopStart);
+*/
+
                     ilGen.Emit(OpCodes.Ldloc_S, returnArray);
                     ilGen.MarkLabel(labelEnd);
                 }
@@ -1180,7 +1192,8 @@ namespace AutoAdapter
                     // If there is a target type set then use that instead of the proxied type.
                     context.TargetType = context.TargetType ?? proxiedReturnType;
 
-                    ConstructorInfo adapterCtor = null;
+                    ConstructorInfo adapterCtor = context.GetAdapterConstructor(methodInfo);
+/*
                     if (context.DoesTypeBuilderImplementInterface(methodInfo.ReturnType) == true)
                     {
                         adapterCtor = context.ConstructorBuilder;
@@ -1195,6 +1208,7 @@ namespace AutoAdapter
 
                         adapterCtor = adapterType.GetConstructor(new Type[] { context.TargetType, typeof(IServiceProvider) });
                     }
+*/
 
                     Label notNull = ilGen.DefineLabel();
                     Label done = ilGen.DefineLabel();
@@ -1226,7 +1240,7 @@ namespace AutoAdapter
         }
 
         /// <summary>
-        /// Handles various scenarios when a proxiabe method is not found.
+        /// Handles various scenarios when a proxiable method is not found.
         /// </summary>
         /// <param name="context">The current <see cref="AdapterContext"/>.</param>
         /// <param name="methodInfo">The current <see cref="MethodInfo"/>.</param>

@@ -41,6 +41,15 @@ namespace AutoAdapter
         Type CreateAdapterType<T>(Type typeToAdapt, IServiceProvider serviceProvider = null);
 
         /// <summary>
+        /// Creates an adapter type.
+        /// </summary>
+        /// <param name="typeToAdapt">The type to adapt.</param>
+        /// <param name="adapterType">The adapter type.</param>
+        /// <param name="serviceProvider">Optional service provider</param>
+        /// <returns>A <see cref="Type"/> representing the new adapter.</returns>
+        Type CreateAdapterType(Type typeToAdapt, Type adapterType, IServiceProvider serviceProvider = null);
+
+        /// <summary>
         /// Create instance of an adapter.
         /// </summary>
         /// <typeparam name="T">The interface describing the adapter type.</typeparam>
