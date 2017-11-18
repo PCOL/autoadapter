@@ -52,12 +52,12 @@ namespace AutoAdapter
         /// <param name="adaptedType">THe adapted type.</param>
         /// <param name="parameterTypes">The parameter types.</param>
         /// <returns>The type name.</returns>
-        public static string TypeName(Type returnType, Type adaptedType, Type[] parameterTypes)
+        private static string MakeTypeName(Type returnType, Type adaptedType, Type[] parameterTypes)
         {
             return string.Format("Dynamic.AdapterFunction_{0}_{1}_{2}",
                 returnType.Name,
                 adaptedType != null ? adaptedType.Name : "#",
-                parameterTypes.Join("_", (p) => p.Name));
+                string.Join("_", parameterTypes.Select(p => p.Name)));
         }
 
         /// <summary>
@@ -91,7 +91,7 @@ namespace AutoAdapter
         /// <returns>A <see cref="Type"/> representing the new adapter.</returns>
         public Type CreateDelegateType(Type returnType, Type adaptedType, Type[] parameterTypes, IServiceProvider serviceProvider)
         {
-            Type delegateType = AssemblyCache.GetType(TypeName(returnType, adaptedType, parameterTypes), true);
+            Type delegateType = AssemblyCache.GetType(MakeTypeName(returnType, adaptedType, parameterTypes), true);
             if (delegateType == null)
             {
                 delegateType = this.GenerateDelegateType(returnType, adaptedType, parameterTypes, serviceProvider);
@@ -117,7 +117,7 @@ namespace AutoAdapter
                 .Default
                 .ModuleBuilder
                 .DefineType(
-                    TypeName(
+                    MakeTypeName(
                         returnType,
                         adaptedType,
                         parameterTypes),

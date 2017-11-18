@@ -30,7 +30,7 @@ namespace AutoAdapter.Reflection
     /// <summary>
     /// Generates the IL for handling an array.
     /// </summary>
-    public class ArrayBuilder
+    internal class ArrayBuilder
     {
         /// <summary>
         /// The <see cref="ILGenerator"/> to use.

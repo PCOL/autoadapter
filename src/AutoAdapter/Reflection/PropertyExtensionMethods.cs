@@ -32,7 +32,7 @@ namespace AutoAdapter.Reflection
     /// <summary>
     /// Property extension methods.
     /// </summary>
-    public static class PropertyExtensionMethods
+    internal static class PropertyExtensionMethods
     {
         /// <summary>
         /// The get property methods name prefix.

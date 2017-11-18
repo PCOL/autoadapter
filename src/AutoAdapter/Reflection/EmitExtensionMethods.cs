@@ -33,7 +33,7 @@ namespace AutoAdapter.Reflection
     /// <summary>
     /// IL Emit Extension methods
     /// </summary>
-    public static class EmitExtensionMethods
+    internal static class EmitExtensionMethods
     {
         /// <summary>
         /// A <see cref="MethodInfo"/> for the <c>Type.GetTypeFromHandle()</c> method.

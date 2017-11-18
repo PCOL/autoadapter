@@ -30,7 +30,7 @@ namespace AutoAdapter
     /// <summary>
     /// <see cref="IEnumerable"/> extension methods.
     /// </summary>
-    public static class IEnumerableExtensions
+    internal static class IEnumerableExtensions
     {
         /// <summary>
         /// Checks if a type that implements <see cref="IEnumerable"/> is null or empty.

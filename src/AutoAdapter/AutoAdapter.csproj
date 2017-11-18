@@ -2,7 +2,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <AssemblyTitle>AutoAdapter</AssemblyTitle>
-    <VersionPrefix>0.0.1-alpha001</VersionPrefix>
+    <VersionPrefix>0.0.1</VersionPrefix>
     <TargetFramework>netstandard2.0</TargetFramework>
     <DebugType>portable</DebugType>
     <AssemblyName>AutoAdapter</AssemblyName>
@@ -22,7 +22,6 @@
     <Content Include="AdapterExtensionMethods.cs" />
     <Content Include="AdapterFuncTypeGenerator.cs" />
     <Content Include="AdapterGenerationException.cs" />
-    <Content Include="AdapterHelpers.cs" />
     <Content Include="AdapterImplAttribute.cs" />
     <Content Include="AdapterTypeGenerator.cs" />
     <Content Include="IAdaptedObject.cs" />
@@ -49,5 +48,6 @@
     <Content Include="Extensions\IAdapterExtension{T,TResult}.cs" />
     <Content Include="Extensions\IAdapterFactoryExtension.cs" />
     <Content Include="Services.cs" />
+    <Content Include="AssemblyInfo.cs" />
   </ItemGroup>
 </Project>

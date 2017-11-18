@@ -31,7 +31,7 @@ namespace AutoAdapter.Reflection
     /// <summary>
     /// Extension methods for the <see cref="ParameterInfo"/> type.
     /// </summary>
-    public static class ParameterInfoExtensions
+    internal static class ParameterInfoExtensions
     {
         /// <summary>
         /// Checks if a parameter has an attribute applied to it.
