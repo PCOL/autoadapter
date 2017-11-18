@@ -41,31 +41,27 @@ namespace AutoAdapter
     internal class AdapterTypeGenerator
         : IAdapterTypeGenerator
     {
-        private IServiceProvider serviceProvider;
+        /// <summary>
+        /// A dependency injection container.
+        /// </summary>
+        private readonly IServiceProvider serviceProvider;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="AdapterTypeGenerator"/> class.
         /// </summary>
-        public AdapterTypeGenerator()
-        {
-        }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="AdapterTypeGenerator"/> class.
-        /// </summary>
-        /// <param name="serviceProvider">A servicve provider.</param>
-        public AdapterTypeGenerator(IServiceProvider serviceProvider)
+        /// <param name="serviceProvider">Optional dependency injection container.</param>
+        public AdapterTypeGenerator(IServiceProvider serviceProvider = null)
         {
             this.serviceProvider = serviceProvider;
         }
 
         /// <summary>
-        /// Gets the name of an adapter type.
+        /// Makes the adapters type name.
         /// </summary>
         /// <param name="adaptedType">The type being adpated.</param>
-        /// <param name="adapterTypes">The adapter types.</param>
+        /// <param name="adapterType">The adapter type.</param>
         /// <returns>The type name.</returns>
-        public static string TypeName(Type adaptedType, Type adapterType)
+        private static string MakeTypeName(Type adaptedType, Type adapterType)
         {
             return $"Dynamic.Adapters.{adaptedType.Name}_{adapterType.Name}";
         }
@@ -76,19 +72,7 @@ namespace AutoAdapter
         /// <typeparam name="T">The interface describing the adapter type.</typeparam>
         /// <param name="typeToAdapt">The type to adapt.</param>
         /// <returns>A new adapter type.</returns>
-        public Type CreateAdapterType<T>(Type typeToAdapt)
-        {
-            return this.CreateAdapterType<T>(typeToAdapt, this.serviceProvider);
-        }
-
-        /// <summary>
-        /// Creates an adapter type.
-        /// </summary>
-        /// <typeparam name="T">The interface describing the adapter type.</typeparam>
-        /// <param name="typeToAdapt">The type to adapt.</param>
-        /// <param name="serviceProvider">The dependency injection scope</param>
-        /// <returns>A new adapter type.</returns>
-        public Type CreateAdapterType<T>(Type typeToAdapt, IServiceProvider serviceProvider)
+        public Type CreateAdapterType<T>(Type typeToAdapt, IServiceProvider serviceProvider = null)
         {
             return this.CreateAdapterType(typeToAdapt, typeof(T), serviceProvider);
         }
@@ -98,52 +82,58 @@ namespace AutoAdapter
         /// </summary>
         /// <typeparam name="T">The interface describing the adapter type.</typeparam>
         /// <param name="instance">The instance of the object to adapt.</param>
+        /// <param name="serviceProvider">Optional dependency injection container.</param>
         /// <returns>An instance of the adapter if valid; otherwise null.</returns>
-        public T CreateAdapter<T>(object instance)
+        public T CreateAdapter<T>(object instance, IServiceProvider serviceProvider = null)
         {
-            return this.CreateAdapter<T>(instance, this.serviceProvider);
-        }
-
-        /// <summary>
-        /// Create instance of an adapter.
-        /// </summary>
-        /// <typeparam name="T">The interface describing the adapter type.</typeparam>
-        /// <param name="instance">The instance of the object to adapt.</param>
-        /// <param name="serviceProvider">The dependency injection scope to use.</param>
-        /// <returns>An instance of the adapter if valid; otherwise null.</returns>
-        public T CreateAdapter<T>(object instance, IServiceProvider serviceProvider)
-        {
-            if (instance == null)
-            {
-                return default(T);
-            }
-
-            return (T)this.CreateAdapterInternal(instance, typeof(T), serviceProvider);
+            return (T)this.CreateAdapter(instance, typeof(T), serviceProvider);
         }
 
         /// <summary>
         /// Creates an adapter object to represent the desired types.
         /// </summary>
-        /// <param name="inst">The instance of the object to adapt.</param>
+        /// <param name="instance">The instance of the object to adapt.</param>
         /// <param name="types">The interface types to implement on the adapter type.</param>
-        /// <param name="serviceProvider">The dependency injection scope to use.</param>
+        /// <param name="serviceProvider">Optional dependency injection container.</param>
         /// <returns>An instance of the adapter if valid; otherwise null.</returns>
-        private object CreateAdapterInternal(object inst, Type adapterType, IServiceProvider serviceProvider)
+        public object CreateAdapter(object instance, Type adapterType, IServiceProvider serviceProvider = null)
         {
-            Type newAdapterType = this.CreateAdapterType(inst.GetType(), adapterType, serviceProvider);
-            return Activator.CreateInstance(newAdapterType, inst, serviceProvider);
+            if (instance == null)
+            {
+                throw new ArgumentNullException(nameof(instance));
+            }
+
+            Type newAdapterType = this.CreateAdapterType(instance.GetType(), adapterType, serviceProvider);
+            return Activator.CreateInstance(newAdapterType, instance, serviceProvider);
         }
 
         /// <summary>
         /// Creates an adapter type.
         /// </summary>
         /// <param name="adaptedType">The type to adapt.</param>
-        /// <param name="adapterTypes">The interface types to implement on the adapter type.</param>
-        /// <param name="serviceProvider">The dependency injection scope to use.</param>
+        /// <param name="adapterType">The interface type to implement on the adapter type.</param>
+        /// <param name="serviceProvider">Optional dependency injection container.</param>
         /// <returns>A <see cref="Type"/> representing the new adapter.</returns>
-        public Type CreateAdapterType(Type adaptedType, Type adapterType, IServiceProvider serviceProvider)
+        public Type CreateAdapterType(Type adaptedType, Type adapterType, IServiceProvider serviceProvider = null)
         {
-            string typeName = TypeName(adaptedType, adapterType);
+            if (adaptedType == null)
+            {
+                throw new ArgumentNullException(nameof(adaptedType));
+            }
+
+            if (adapterType == null)
+            {
+                throw new ArgumentNullException(nameof(adapterType));
+            }
+
+            if (adapterType.IsInterface == false)
+            {
+                throw new ArgumentException("Adapter type must be an interface", nameof(adapterType));
+            }
+
+            serviceProvider = serviceProvider ?? this.serviceProvider;
+
+            string typeName = MakeTypeName(adaptedType, adapterType);
             Type newAdapterType = TypeFactory.Default.GetType(typeName, true);
             if (newAdapterType == null)
             {
@@ -157,7 +147,7 @@ namespace AutoAdapter
         /// Generates the adapter type.
         /// </summary>
         /// <param name="adaptedType">The type being adapted.</param>
-        /// <param name="adapterType">The adapters interface types to implement.</param>
+        /// <param name="adapterType">The adapter interface type to implement.</param>
         /// <param name="serviceProvider">The dependency injection scope to use.</param>
         /// <returns>A <see cref="Type"/> representing the new adapter.</returns>
         private Type GenerateAdapterType(Type adaptedType, Type adapterType, IServiceProvider serviceProvider)
@@ -169,7 +159,7 @@ namespace AutoAdapter
                 .Default
                 .ModuleBuilder
                 .DefineType(
-                    TypeName(adaptedType, adapterType),
+                    MakeTypeName(adaptedType, adapterType),
                     typeAttributes);
 
             FieldBuilder adaptedTypeField =
@@ -186,24 +176,13 @@ namespace AutoAdapter
                     typeof(IServiceProvider),
                     FieldAttributes.Private);
 
-            typeBuilder.AddInterfaceImplementation(typeof(IAdaptedObject));
-
             // Implement the IAdaptedObject interface.
-            this.ImplementAdaptedObjectInterface(
-                typeBuilder,
+            typeBuilder.ImplementAdaptedObjectInterface(
                 adaptedType,
                 adaptedTypeField);
 
-            typeBuilder.AddInterfaceImplementation(adapterType);
-
-            Type[] implementedInterfaces = adapterType.GetInterfaces();
-            if (implementedInterfaces != null)
-            {
-                foreach (Type iface in implementedInterfaces)
-                {
-                    typeBuilder.AddInterfaceImplementation(iface);
-                }
-            }
+            // Add the adapter interface
+            typeBuilder.AddAdapterInterface(adapterType);
 
             // Add a constructor to the type.
             var ctorBuilder =  this.AddConstructor(
@@ -363,47 +342,6 @@ namespace AutoAdapter
         }
 
         /// <summary>
-        /// Implements the <see cref="IAdaptedObject"/> interface on the adapter type.
-        /// </summary>
-        /// <param name="typeBuilder">The <see cref="TypeBuilder"/> use to construct the type.</param>
-        /// <param name="adaptedType">The <see cref="Type"/> being adapted.</param>
-        /// <param name="adaptedTypeField">The <see cref="FieldBuilder"/> which will hold the instance of the adapted type.</param>
-        private void ImplementAdaptedObjectInterface(
-            TypeBuilder typeBuilder,
-            Type adaptedType,
-            FieldBuilder adaptedTypeField)
-        {
-            var propertyAdaptedObject =
-                typeBuilder
-                .DefineProperty(
-                    "AdaptedObject",
-                    PropertyAttributes.None,
-                    CallingConventions.HasThis,
-                    typeof(object),
-                    null);
-
-            MethodBuilder getAdaptedObject =
-                typeBuilder
-                .DefineMethod(
-                    "get_AdaptedObject",
-                    MethodAttributes.Public |
-                    MethodAttributes.Virtual |
-                    MethodAttributes.HideBySig |
-                    MethodAttributes.NewSlot,
-                    CallingConventions.HasThis,
-                    typeof(object),
-                    null);
-
-            var methodIL = getAdaptedObject.GetILGenerator();
-
-            methodIL.Emit(OpCodes.Ldarg_0);
-            methodIL.Emit(OpCodes.Ldfld, adaptedTypeField);
-            methodIL.Emit(OpCodes.Ret);
-
-            propertyAdaptedObject.SetGetMethod(getAdaptedObject);
-        }
-
-        /// <summary>
         /// Implements the adapter types interfaces on the adapted type.
         /// </summary>
         /// <param name="context">The current adapter context.</param>
@@ -464,7 +402,7 @@ namespace AutoAdapter
             PropertyInfo propertyInfo,
             IDictionary<string, MethodBuilder> propertyMethods)
         {
-            this.GetPropertyTargetDetails(propertyInfo, context);
+            propertyInfo.AddTargetPropertyDetailsToContext(context);
 
             // Builde the property.
             var propertyBuilder = context
@@ -491,109 +429,6 @@ namespace AutoAdapter
             {
                 propertyBuilder.SetSetMethod(setMethod);
             }
-        }
-
-        /// <summary>
-        /// Gets the target name for a property.
-        /// </summary>
-        /// <param name="propertyInfo">A <see cref="PropertyInfo"/> instace.</param>
-        /// <param name="targetType">A variable to receive the target type.</param>
-        /// <param name="targetStaticType">A variable to receive the target static type.</param>
-        /// <param name="adapterExtensionMethodName">A variable to receive an adapter extension method name.</param>
-        /// <returns>The target name.</returns>
-        private void GetPropertyTargetDetails(PropertyInfo propertyInfo, AdapterContext context)
-        {
-            context.TargetMemberName = propertyInfo.Name;
-
-            // Check for a property extension attribute.
-            AdapterExtensionAttribute adapterAttr = propertyInfo.GetCustomAttribute<AdapterExtensionAttribute>();
-            if (adapterAttr != null)
-            {
-                context.ExtensionMethodName = adapterAttr.ExtensionName;
-            }
-
-            TargetMemberType targetMemberType;
-            Type targetStaticType;
-            Type targetType;
-            string attrTargetName = this.GetMemberTargetName(
-                propertyInfo.GetCustomAttribute<AdapterImplAttribute>(),
-                out targetStaticType,
-                out targetMemberType,
-                out targetType);
-
-            if (targetMemberType == TargetMemberType.Property ||
-                targetMemberType == TargetMemberType.NotSet)
-            {
-                context.TargetMemberName =
-                    attrTargetName.IsNullOrEmpty() == false ?
-                    propertyInfo.Name + attrTargetName :
-                    context.TargetMemberName;
-            }
-            else if (targetMemberType == TargetMemberType.Method)
-            {
-                context.TargetMemberName =
-                    attrTargetName.IsNullOrEmpty() == false ?
-                    attrTargetName :
-                    context.TargetMemberName;
-            }
-
-            context.TargetType = targetType;
-            context.TargetStaticType = targetStaticType;
-        }
-
-        /// <summary>
-        /// Gets the target name for a method.
-        /// </summary>
-        /// <param name="methodInfo">A <see cref="MethodInfo"/> instace.</param>
-        /// <param name="context">The adapter context.</param>
-        private void GetMethodTargetDetails(MethodInfo methodInfo, AdapterContext context)
-        {
-            MemberInfo memberInfo = methodInfo;
-            if (methodInfo.IsProperty() == true)
-            {
-                memberInfo = methodInfo.GetProperty();
-            }
-
-            context.TargetMemberName = methodInfo.Name;
-
-            // Check for a return type extension attribute.
-            object[] adapterAttrs = methodInfo
-                .ReturnTypeCustomAttributes
-                .GetCustomAttributes(typeof(AdapterExtensionAttribute), false);
-
-            if (adapterAttrs != null &&
-                adapterAttrs.Any() == true)
-            {
-                context.ExtensionMethodName = ((AdapterExtensionAttribute)adapterAttrs.First()).ExtensionName;
-            }
-
-            TargetMemberType targetMemberType;
-            Type targetStaticType;
-            Type targetType;
-            string attrTargetName = this.GetMemberTargetName(
-                memberInfo.GetCustomAttribute<AdapterImplAttribute>(),
-                out targetStaticType,
-                out targetMemberType,
-                out targetType);
-
-            if (targetMemberType == TargetMemberType.Property)
-            {
-                context.TargetMemberName =
-                    attrTargetName.IsNullOrEmpty() == false ?
-                    methodInfo.Name.Substring(0, 4) + attrTargetName :
-                    context.TargetMemberName;
-            }
-            else if (targetMemberType == TargetMemberType.Method ||
-                targetMemberType == TargetMemberType.NotSet)
-            {
-                context.TargetMemberName =
-                    attrTargetName.IsNullOrEmpty() == false ?
-                    attrTargetName :
-                    context.TargetMemberName;
-            }
-
-            context.TargetType = targetType;
-            context.TargetStaticType = targetStaticType;
         }
 
         /// <summary>
@@ -884,7 +719,7 @@ namespace AutoAdapter
 
             if (implemented == false)
             {
-                this.GetMethodTargetDetails(methodInfo, context);
+                methodInfo.AddTargetMethodDetailsToContext(context);
 
                 this.BuildMethod(
                     context,
@@ -942,7 +777,7 @@ namespace AutoAdapter
                 AdapterAttribute attr = methodInfo.ReturnType.GetCustomAttribute<AdapterAttribute>();
                 if (attr != null)
                 {
-                    proxiedReturnType = this.GetAdaptedType(attr);
+                    proxiedReturnType = attr.GetAdaptedType();
                 }
 
                 // Declare locals
@@ -1096,13 +931,9 @@ namespace AutoAdapter
                     }
 
                     Label labelStart = ilGen.DefineLabel();
-                    // Label loopStart = ilGen.DefineLabel();
-                    // Label loopCheck = ilGen.DefineLabel();
                     Label labelEnd = ilGen.DefineLabel();
 
                     LocalBuilder returnArray = ilGen.DeclareLocal(methodInfo.ReturnType);
-                    //LocalBuilder index = ilGen.DeclareLocal<int>();
-                    //LocalBuilder done = ilGen.DeclareLocal<bool>();
 
                     // If null then exit...
                     ilGen.Emit(OpCodes.Brtrue_S, labelStart);
@@ -1130,41 +961,6 @@ namespace AutoAdapter
                             ilGen.Emit(OpCodes.Newobj, adapterCtor);
                             ilGen.Emit(OpCodes.Stelem_Ref);
                         });
-
-/*
-                    ilGen.Emit(OpCodes.Ldc_I4_0);
-                    ilGen.Emit(OpCodes.Stloc_S, index);
-                    ilGen.Emit(OpCodes.Br_S, loopCheck);
-
-                    ilGen.MarkLabel(loopStart);
-                    ilGen.Emit(OpCodes.Nop);
-                    ilGen.Emit(OpCodes.Ldloc_S, returnArray);
-                    ilGen.Emit(OpCodes.Ldloc_S, index);
-
-                    ilGen.Emit(OpCodes.Ldloc_S, proxiedReturn);
-                    ilGen.Emit(OpCodes.Ldloc_S, index);
-                    ilGen.Emit(OpCodes.Ldelem_Ref);
-                    ilGen.Emit(OpCodes.Ldarg_0);
-                    ilGen.Emit(OpCodes.Ldfld, context.ServiceProviderField);
-                    ilGen.Emit(OpCodes.Newobj, adapterCtor);
-                    ilGen.Emit(OpCodes.Stelem_Ref);
-                    ilGen.Emit(OpCodes.Nop);
-                    ilGen.Emit(OpCodes.Ldloc_S, index);
-                    ilGen.Emit(OpCodes.Ldc_I4_1);
-                    ilGen.Emit(OpCodes.Add);
-                    ilGen.Emit(OpCodes.Stloc_S, index);
-
-                    ilGen.MarkLabel(loopCheck);
-                    ilGen.Emit(OpCodes.Ldloc_S, index);
-                    ilGen.Emit(OpCodes.Ldloc_S, returnArray);
-                    ilGen.Emit(OpCodes.Ldlen);
-                    ilGen.Emit(OpCodes.Conv_I4);
-                    ilGen.Emit(OpCodes.Clt);
-                    ilGen.Emit(OpCodes.Stloc_S, done);
-
-                    ilGen.Emit(OpCodes.Ldloc_S, done);
-                    ilGen.Emit(OpCodes.Brtrue_S, loopStart);
-*/
 
                     ilGen.Emit(OpCodes.Ldloc_S, returnArray);
                     ilGen.MarkLabel(labelEnd);
@@ -1311,71 +1107,6 @@ namespace AutoAdapter
                 // Unable to implement the desired method.
                 ilGen.ThrowException(typeof(NotImplementedException));
             }
-        }
-
-        /// <summary>
-        /// Gets the target member name from an <see cref="AdapterImplAttribute"/> instance
-        /// </summary>
-        /// <param name="implAttr">An <see cref="AdapterImplAttribute"/> instance.</param>
-        /// <param name="targetStaticType">A variable to receive the target static type.</param>
-        /// <param name="targetMemberType">A variable to receive the target member type.</param>
-        /// <param name="targetType">A variable to receive the target type.</param>
-        /// <returns>The target members name.</returns>
-        private string GetMemberTargetName(
-            AdapterImplAttribute implAttr,
-            out Type targetStaticType,
-            out TargetMemberType targetMemberType,
-            out Type targetType)
-        {
-            targetStaticType = null;
-            targetMemberType = TargetMemberType.NotSet;
-            targetType = null;
-
-            if (implAttr != null)
-            {
-                var type = implAttr.TargetType;
-                if (type == null &&
-                    implAttr.TargetTypeName.IsNullOrEmpty() == false)
-                {
-                    type = TypeFactory.Default.GetType(implAttr.TargetTypeName, false);
-                }
-
-                if (implAttr.TargetBinding == AdapterBinding.Static)
-                {
-                    targetStaticType = type;
-                }
-                else
-                {
-                    targetType = type;
-                }
-
-                targetMemberType = implAttr.TargetMemberType;
-                return implAttr.TargetMemberName;
-            }
-
-            return null;
-        }
-
-        /// <summary>
-        /// Gets the adapted type from a <see cref="AdapterAttribute"/> instance.
-        /// </summary>
-        /// <param name="attr">The <see cref="AdpaterAttribute"/> instance.</param>
-        /// <returns>The adapted type if found; otherwise null.</returns>
-        private Type GetAdaptedType(AdapterAttribute attr)
-        {
-            if (attr != null)
-            {
-                Type adaptedType = attr.AdaptedType;
-                if (adaptedType == null &&
-                    attr.AdaptedTypeName.IsNullOrEmpty() == false)
-                {
-                    adaptedType = TypeFactory.Default.GetType(attr.AdaptedTypeName, false);
-                }
-
-                return adaptedType;
-            }
-
-            return null;
         }
     }
 }

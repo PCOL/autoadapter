@@ -25,6 +25,7 @@ SOFTWARE.
 namespace AutoAdapter
 {
     using System;
+    using AutoAdapter.Reflection;
 
     /// <summary>
     /// An attribute used to specify the adapted type on interfaces and enumerations.
@@ -60,5 +61,22 @@ namespace AutoAdapter
         /// Gets the adapted type name.
         /// </summary>
         public string AdaptedTypeName { get; }
+
+        /// <summary>
+        /// Gets the adapted type from a <see cref="AdapterAttribute"/> instance.
+        /// </summary>
+        /// <param name="attr">The <see cref="AdpaterAttribute"/> instance.</param>
+        /// <returns>The adapted type if found; otherwise null.</returns>
+        internal Type GetAdaptedType()
+        {
+            Type adaptedType = this.AdaptedType;
+            if (adaptedType == null &&
+                this.AdaptedTypeName.IsNullOrEmpty() == false)
+            {
+                adaptedType = TypeFactory.Default.GetType(this.AdaptedTypeName, false);
+            }
+
+            return adaptedType;
+        }
     }
 }

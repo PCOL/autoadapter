@@ -26,6 +26,7 @@ namespace AutoAdapter
 {
     using System;
     using System.Reflection;
+    using AutoAdapter.Reflection;
 
     /// <summary>
     /// An attribute used to influence the adapter implementation.
@@ -58,5 +59,42 @@ namespace AutoAdapter
         /// Gets or sets the target members type.
         /// </summary>
         public TargetMemberType TargetMemberType { get; set; }
+
+                /// <summary>
+        /// Gets the target member name from an <see cref="AdapterImplAttribute"/> instance
+        /// </summary>
+        /// <param name="implAttr">An <see cref="AdapterImplAttribute"/> instance.</param>
+        /// <param name="targetStaticType">A variable to receive the target static type.</param>
+        /// <param name="targetMemberType">A variable to receive the target member type.</param>
+        /// <param name="targetType">A variable to receive the target type.</param>
+        /// <returns>The target members name.</returns>
+        internal string GetMemberTargetName(
+            out Type targetStaticType,
+            out TargetMemberType targetMemberType,
+            out Type targetType)
+        {
+            targetStaticType = null;
+            targetMemberType = TargetMemberType.NotSet;
+            targetType = null;
+
+            var type = this.TargetType;
+            if (type == null &&
+                this.TargetTypeName.IsNullOrEmpty() == false)
+            {
+                type = TypeFactory.Default.GetType(this.TargetTypeName, false);
+            }
+
+            if (this.TargetBinding == AdapterBinding.Static)
+            {
+                targetStaticType = type;
+            }
+            else
+            {
+                targetType = type;
+            }
+
+            targetMemberType = this.TargetMemberType;
+            return this.TargetMemberName;
+        }
     }
 }
