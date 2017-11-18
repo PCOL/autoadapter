@@ -1089,26 +1089,15 @@ namespace AutoAdapter
                     Type returnType = methodInfo.ReturnType.GetElementType();
                     Type proxiedType = proxiedReturnType.GetElementType();
 
-                    ConstructorInfo adapterCtor = context.GetAdapterConstructor(methodInfo);
-/*
-                    if (context.DoesTypeBuilderImplementInterface(returnType) == true)
+                    ConstructorInfo adapterCtor = context.GetAdapterConstructor(proxiedType, returnType);
+                    if (adapterCtor == null)
                     {
-                        adapterCtor = context.ConstructorBuilder;
+                        throw new AdapterGenerationException("Constructor not found");
                     }
-                    else
-                    {
-                        Type adapterType = this.CreateAdapterType(
-                            proxiedType,
-                            new Type[] { returnType },
-                            context.ServiceProvider);
-
-                        adapterCtor = adapterType.GetConstructor(new Type[] { proxiedType, typeof(IServiceProvider) });
-                    }
-*/
 
                     Label labelStart = ilGen.DefineLabel();
-                    Label loopStart = ilGen.DefineLabel();
-                    Label loopCheck = ilGen.DefineLabel();
+                    // Label loopStart = ilGen.DefineLabel();
+                    // Label loopCheck = ilGen.DefineLabel();
                     Label labelEnd = ilGen.DefineLabel();
 
                     LocalBuilder returnArray = ilGen.DeclareLocal(methodInfo.ReturnType);
@@ -1192,23 +1181,7 @@ namespace AutoAdapter
                     // If there is a target type set then use that instead of the proxied type.
                     context.TargetType = context.TargetType ?? proxiedReturnType;
 
-                    ConstructorInfo adapterCtor = context.GetAdapterConstructor(methodInfo);
-/*
-                    if (context.DoesTypeBuilderImplementInterface(methodInfo.ReturnType) == true)
-                    {
-                        adapterCtor = context.ConstructorBuilder;
-                    }
-                    else
-                    {
-                        // We need to create a new adapted object.
-                        Type adapterType = this.CreateAdapterType(
-                            context.TargetType,
-                            new Type[] { methodInfo.ReturnType },
-                            context.ServiceProvider);
-
-                        adapterCtor = adapterType.GetConstructor(new Type[] { context.TargetType, typeof(IServiceProvider) });
-                    }
-*/
+                    ConstructorInfo adapterCtor = context.GetAdapterConstructor(context.TargetType, methodInfo.ReturnType);
 
                     Label notNull = ilGen.DefineLabel();
                     Label done = ilGen.DefineLabel();

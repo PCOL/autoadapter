@@ -26,5 +26,11 @@
     <Content Include="Resources\IApmAdapter.cs" />
     <Content Include="Resources\ITaskApmAdpater.cs" />
     <Content Include="ApmAdapterTests.cs" />
+    <Content Include="Resources\IAdapterWithChildAdapter.cs" />
+    <Content Include="Resources\IChildAdapter.cs" />
+    <Content Include="Resources\AdapteeWithChildAdaptee.cs" />
+    <Content Include="Resources\ChildAdaptee.cs" />
+    <Content Include="Resources\ArrayAdaptee.cs" />
+    <Content Include="Resources\IArrayAdapter.cs" />
   </ItemGroup>
 </Project>

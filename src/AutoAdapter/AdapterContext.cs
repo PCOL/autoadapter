@@ -178,21 +178,21 @@ namespace AutoAdapter
             return this.TypeBuilder.GetInterfaces().FirstOrDefault((type) => ifaceType == type) != null;
         }
 
-        public ConstructorInfo GetAdapterConstructor(MethodInfo methodInfo)
+        public ConstructorInfo GetAdapterConstructor(Type targetType, Type returnType)
         {
             ConstructorInfo adapterCtor = null;
-            if (this.DoesTypeBuilderImplementInterface(methodInfo.ReturnType) == true)
+            if (this.DoesTypeBuilderImplementInterface(returnType) == true)
             {
                 adapterCtor = this.ConstructorBuilder;
             }
             else
             {
                 // We need to create a new adapted object.
-                Type adapterType = this.TargetType.CreateAdapterType(
-                    methodInfo.ReturnType,
+                Type adapterType = targetType.CreateAdapterType(
+                    returnType,
                     this.ServiceProvider);
 
-                adapterCtor = adapterType.GetConstructor(new Type[] { this.TargetType, typeof(IServiceProvider) });
+                adapterCtor = adapterType.GetConstructor(new Type[] { targetType, typeof(IServiceProvider) });
             }
 
             return adapterCtor;

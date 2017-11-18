@@ -90,5 +90,80 @@ namespace AutoAdapterUnitTests
             Assert.Equal("Test", testIndexAdapter[1]);
             Assert.Equal(200, testIndexAdapter[1, 100]);
         }
+
+        [Fact]
+        public void CreateIAdapterWithChildAdapter_FromAdapteeWithChildAdaptee_TestChild()
+        {
+            var adaptee = new AdapteeWithChildAdaptee()
+            {
+                Child = new ChildAdaptee()
+                {
+                    Property = "TEST"
+                }
+            };
+
+            var adapter = adaptee.CreateAdapter<IAdapterWithChildAdapter>();
+
+            Assert.NotNull(adapter);
+            Assert.NotNull(adapter.Child);
+            Assert.Equal("TEST", adapter.Child.Property);
+            Assert.Equal("Test", adapter.Child.Method("Test"));
+        }
+
+        [Fact]
+        public void CreateIAdapterWithChildAdapter_FromAdapteeWithChildAdaptee_TestChildren()
+        {
+            var adaptee = new AdapteeWithChildAdaptee()
+            {
+                Children = new[]
+                {
+                    new ChildAdaptee()
+                    {
+                        Property = "One"
+                    },
+                    new ChildAdaptee()
+                    {
+                        Property = "Two"
+                    },
+                    new ChildAdaptee()
+                    {
+                        Property = "Three"
+                    }
+                }
+            };
+
+            var adapter = adaptee.CreateAdapter<IAdapterWithChildAdapter>();
+
+            Assert.NotNull(adapter);
+            Assert.NotNull(adapter.Children);
+            Assert.Equal(adaptee.Children.Length, adapter.Children.Length);
+            for (int i = 0; i < adaptee.Children.Length; i++)
+            {
+                Assert.Equal(adaptee.Children[i].Property, adapter.Children[i].Property);
+            }
+        }
+
+        [Fact]
+        public void CreateIArrayAdapter_FromArrayAdaptee()
+        {
+            var adaptee = new ArrayAdaptee()
+            {
+                ArrayProperty = new[]
+                {
+                    "One",
+                    "Two",
+                    "Three"
+                }
+            };
+
+            var adapter = adaptee.CreateAdapter<IArrayAdapter>();
+            Assert.NotNull(adapter);
+            Assert.NotNull(adapter.ArrayProperty);
+            Assert.Equal(adaptee.ArrayProperty.Length, adapter.ArrayProperty.Length);
+            for (int i = 0; i < adaptee.ArrayProperty.Length; i++)
+            {
+                Assert.Equal(adaptee.ArrayProperty[i], adapter.ArrayProperty[i]);
+            }
+        }
     }
 }

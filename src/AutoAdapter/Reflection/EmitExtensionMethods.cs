@@ -789,7 +789,7 @@ namespace AutoAdapter.Reflection
         }
 
         /// <summary>
-        /// Emits IL to perform a for loop over an array.
+        /// Emits IL to perform a for loop over an array without element loading.
         /// </summary>
         /// <param name="ilGen">An IL generator.</param>
         /// <param name="localArray">The local variable holding the array.</param>
@@ -828,7 +828,7 @@ namespace AutoAdapter.Reflection
         }
 
         /// <summary>
-        /// Emits IL to perform a for loop over an array.
+        /// Emits IL to perform a for loop over an array with element loading.
         /// </summary>
         /// <param name="ilGen">An IL generator.</param>
         /// <param name="localArray">The local variable holding the array.</param>
