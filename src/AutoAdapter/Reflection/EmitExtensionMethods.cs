@@ -25,6 +25,7 @@ SOFTWARE.
 namespace AutoAdapter.Reflection
 {
     using System;
+    using System.Collections.Generic;
     using System.Reflection;
     using System.Reflection.Emit;
 
@@ -352,40 +353,19 @@ namespace AutoAdapter.Reflection
         /// Emits the IL for a methods parameters.
         /// </summary>
         /// <param name="methodIL">The methods <see cref="ILGenerator"/>.</param>
-        /// <param name="methodInfo">The <see cref="MethodInfo"/> of the method being implemented.</param>
-        /// <param name="proxiedMethod">The <see cref="MethodInfo"/> of the method being proxied.</param>
-        /// <param name="context">The current adapter factory context.</param>
-        /// <param name="staticMethod">A value indicating whether or not the method is static.</param>
-        internal static ILGenerator EmitParameters(
-            this ILGenerator methodIL,
-            MethodInfo methodInfo,
-            MethodInfo proxiedMethod,
-            AdapterContext context,
-            bool staticMethod = false)
-        {
-            return methodIL.EmitParameters(
-                methodInfo.GetParameters(),
-                proxiedMethod.GetParameters(),
-                context,
-                staticMethod);
-        }
-
-        /// <summary>
-        /// Emits the IL for a methods parameters.
-        /// </summary>
-        /// <param name="methodIL">The methods <see cref="ILGenerator"/>.</param>
+        /// <param name="adpaterContext">The current adapter factory context.</param>
+        /// <param name="methodContext">The <see cref="MethodBuilderContext"/> of the method being implemented.</param>
         /// <param name="parameters">The parameters of the method being implemented.</param>
         /// <param name="proxiedParameters">The parameters of the proxeid method.</param>
         /// <param name="context">The current adapter factory context.</param>
         /// <param name="staticMethod">A value indicating whether or not the method is static.</param>
         internal static ILGenerator EmitParameters(
             this ILGenerator methodIL,
-            ParameterInfo[] parameters,
-            ParameterInfo[] proxiedParameters,
             AdapterContext context,
+            MethodBuilderContext methodContext,
             bool staticMethod = false)
         {
-            for (int i = 0; i < parameters.Length; i++)
+            for (int i = 0; i < methodContext.Parameters.Length; i++)
             {
                 int argIndex = i;
                 if (staticMethod == false)
@@ -393,11 +373,16 @@ namespace AutoAdapter.Reflection
                     argIndex++;
                 }
 
+                var parm = methodContext.Parameters[i];
+                var parmType = parm.ParameterType;
+                var proxiedParm = methodContext.ProxiedParameters[i];
+                var proxiedParmType = proxiedParm.ParameterType;
+
                 // Does the parameter have and an adapter extension applied?
-                AdapterExtensionAttribute paramAttr = parameters[i].GetCustomAttribute<AdapterExtensionAttribute>();
+                AdapterExtensionAttribute paramAttr = parm.GetCustomAttribute<AdapterExtensionAttribute>();
                 if (paramAttr != null)
                 {
-                    LocalBuilder parmValue = methodIL.DeclareLocal(parameters[i].ParameterType);
+                    LocalBuilder parmValue = methodIL.DeclareLocal(parmType);
 
                     methodIL.Emit(OpCodes.Ldarg, argIndex);
                     methodIL.Emit(OpCodes.Stloc_S, parmValue);
@@ -410,16 +395,16 @@ namespace AutoAdapter.Reflection
                     {
                         methodIL.EmitAdapterExtensionExecution(
                                 extensionMethodName,
-                                parameters[i].ParameterType,
-                                parameters[i].ParameterType,
+                                parmType,
+                                parmType,
                                 context,
                                 parmValue,
                                 parmValue);
                     }
 
                     // Do we need to create an adapter for the returned data?
-                    if (parameters[i].ParameterType != proxiedParameters[i].ParameterType &&
-                        parameters[i].ParameterType.IsInterface == true)
+                    if (parmType != proxiedParmType &&
+                        parmType.IsInterface == true)
                     {
                         // TODO: Create an adapter?
                         methodIL.EmitGetAdaptedObject(parmValue);
@@ -431,15 +416,15 @@ namespace AutoAdapter.Reflection
 
                     // Is this parameter an out parameter, do we have an extension method and
                     // is its placement after the method executes?
-                    if (parameters[i].IsOut == true &&
+                    if (parm.IsOut == true &&
                         extensionMethodName != null &&
                         paramAttr.Placement.HasValue == true &&
                         paramAttr.Placement.Value == AdapterExtensionPlacement.After)
                     {
                         methodIL.EmitAdapterExtensionExecution(
                                 extensionMethodName,
-                                parameters[i].ParameterType,
-                                parameters[i].ParameterType,
+                                parmType,
+                                parmType,
                                 context,
                                 parmValue,
                                 parmValue);
@@ -447,24 +432,30 @@ namespace AutoAdapter.Reflection
                         methodIL.Emit(OpCodes.Ldloc_S, parmValue);
                     }
                 }
-                else if (parameters[i].ParameterType != proxiedParameters[i].ParameterType)
+                else if (parmType != proxiedParmType)
                 {
                     // The parameter types do not match so we need to convert the parameter
-
                     // Is the parameter an interface?
-                    if (parameters[i].ParameterType.IsInterface == true)
+                    if (parmType.IsInterface == true)
                     {
-                        LocalBuilder parmValue = methodIL.DeclareLocal(parameters[i].ParameterType);
-
+                        LocalBuilder parmValue = methodIL.DeclareLocal(parmType);
                         methodIL.Emit(OpCodes.Ldarg, argIndex);
                         methodIL.Emit(OpCodes.Stloc_S, parmValue);
                         methodIL.EmitGetAdaptedObject(parmValue);
                     }
-                    else if (parameters[i].ParameterType.IsEnum == true)
+                    else if (parmType.IsByRef == true &&
+                        parmType.GetElementType().IsInterface == true)
+                    {
+                        Type proxiedType = proxiedParmType.GetElementType();
+                        LocalBuilder parmValue = methodIL.DeclareLocal(proxiedType);
+                        methodIL.Emit(OpCodes.Ldloca, parmValue);
+                        methodContext.AddOutParameter(argIndex, parmValue);
+                    }
+                    else if (parmType.IsEnum == true)
                     {
                         // Load the argument and convert it
                         methodIL.Emit(OpCodes.Ldarg, argIndex);
-                        methodIL.EmitConv(parameters[i].ParameterType, proxiedParameters[i].ParameterType, false);
+                        methodIL.EmitConv(parmType, proxiedParmType, false);
                         //methodIL.Emit(OpCodes.Conv_I4);
                     }
                     else
@@ -588,6 +579,38 @@ namespace AutoAdapter.Reflection
                 ilGen.Emit(OpCodes.Box, boxType);
             }
 
+            return ilGen;
+        }
+
+        /// <summary>
+        /// Emits IL to unbox a value type.
+        /// </summary>
+        /// <param name="ilGen">The <see cref="ILGenerator"/> to use.</param>
+        /// <param name="boxType">The box type.</param>
+        /// <returns>The <see cref="ILGenerator"/> instance</returns>
+        public static ILGenerator EmitUnbox(this ILGenerator ilGen, Type boxType)
+        {
+            if (boxType.IsValueType == true)
+            {
+                ilGen.Emit(OpCodes.Unbox, boxType);
+            }
+
+            return ilGen;
+        }
+
+        /// <summary>
+        /// Emits IL to store a value in an out/ref parameter
+        /// </summary>
+        /// <param name="ilGen">The <see cref="ILGenerator"/> to use.</param>
+        /// <param name="arg"></param>
+        /// <param name="localValue"></param>
+        /// <returns></returns>
+        public static ILGenerator EmitStoreByRefArg(this ILGenerator ilGen, int arg, LocalBuilder localValue, Action conversion = null)
+        {
+            ilGen.Emit(OpCodes.Ldarg, arg);
+            ilGen.Emit(OpCodes.Ldloc, localValue);
+            conversion?.Invoke();
+            ilGen.Emit(OpCodes.Stind_Ref);
             return ilGen;
         }
 

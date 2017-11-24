@@ -3,6 +3,10 @@
   <PropertyGroup>
     <AssemblyTitle>AutoAdapter</AssemblyTitle>
     <VersionPrefix>0.0.1</VersionPrefix>
+    <Title>Adapter Type Generator</Title>
+    <Description>Package to generate adapter types from interface definitions.</Description>
+    <Authors>pcol</Authors>
+    <Copyright>Copyright 2017</Copyright>
     <TargetFramework>netstandard2.0</TargetFramework>
     <DebugType>portable</DebugType>
     <AssemblyName>AutoAdapter</AssemblyName>
@@ -49,5 +53,7 @@
     <Content Include="Extensions\IAdapterFactoryExtension.cs" />
     <Content Include="Services.cs" />
     <Content Include="AssemblyInfo.cs" />
+    <Content Include="AdapterMethodContext.cs" />
+    <Content Include="MethodBuilderContext.cs" />
   </ItemGroup>
 </Project>
