@@ -138,26 +138,6 @@ namespace AutoAdapter
         public ConstructorBuilder ConstructorBuilder { get; }
 
         /// <summary>
-        /// Gets or sets the name of a the target.
-        /// </summary>
-        public string TargetMemberName { get; set; }
-
-        /// <summary>
-        /// Gets or sets the name of an extension method.
-        /// </summary>
-        public string ExtensionMethodName { get; set; }
-
-        /// <summary>
-        /// Gets or sets the target type.
-        /// </summary>
-        public Type TargetType { get; set; }
-
-        /// <summary>
-        /// Gets or sets the target static type.
-        /// </summary>
-        public Type TargetStaticType { get; set; }
-
-        /// <summary>
         /// Creates a new <see cref="TypeFactoryContext"/> instance for a new interface type.
         /// </summary>
         /// <param name="interfaceType">The adapter <see cref="Type"/>.</param>

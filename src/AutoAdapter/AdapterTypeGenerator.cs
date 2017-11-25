@@ -361,19 +361,18 @@ namespace AutoAdapter
 
             foreach (var memberInfo in adapterContext.NewType.GetMembers())
             {
+                var builderContext = new BuilderContext(adapterContext, memberInfo);
                 if (memberInfo.MemberType == MemberTypes.Method)
                 {
-                    var methodContext = new MethodBuilderContext(adapterContext, (MethodInfo)memberInfo);
-                    MethodInfo methodInfo = (MethodInfo)memberInfo;
-
+                    MethodInfo methodInfo = builderContext.Method;
                     MethodBuilder methodBuilder = null;
                     if (methodInfo.ContainsGenericParameters == true)
                     {
-                        methodBuilder = this.BuildGenericMethod(adapterContext, methodInfo);
+                        methodBuilder = this.BuildGenericMethod(adapterContext, builderContext);
                     }
                     else
                     {
-                        methodBuilder = this.BuildMethod(adapterContext, methodContext);
+                        methodBuilder = this.BuildMethod(adapterContext, builderContext);
                     }
 
                     if (methodInfo.IsProperty() == true)
@@ -385,7 +384,7 @@ namespace AutoAdapter
                 else if (memberInfo.MemberType == MemberTypes.Property)
                 {
                     this.DefineProperty(
-                        adapterContext,
+                        builderContext,
                         (PropertyInfo)memberInfo,
                         propertyMethods);
                 }
@@ -399,14 +398,13 @@ namespace AutoAdapter
         /// <param name="propertyInfo">A <see cref="PropertyInfo"/>.</param>
         /// <param name="propertyMethods">A dictionary of property method implementations.</param>
         private void DefineProperty(
-            AdapterContext context,
+            BuilderContext context,
             PropertyInfo propertyInfo,
             IDictionary<string, MethodBuilder> propertyMethods)
         {
-            propertyInfo.AddTargetPropertyDetailsToContext(context);
-
-            // Builde the property.
+            // Build the property.
             var propertyBuilder = context
+                .AdapterContext
                 .TypeBuilder
                 .DefineProperty(
                     propertyInfo.Name,
@@ -435,30 +433,26 @@ namespace AutoAdapter
         /// <summary>
         /// Builds a generic method.
         /// </summary>
-        /// <param name="context">The current <see cref="AdapterContext"/.></param>
-        /// <param name="methodInfo">The current <see cref="MethodInfo"/>.</param>
-        private MethodBuilder BuildGenericMethod(AdapterContext context, MethodInfo methodInfo)
+        /// <param name="adapterContext">The current <see cref="AdapterContext"/.></param>
+        /// <param name="builderContext">The current <see cref="BuilderContext"/>.</param>
+        private MethodBuilder BuildGenericMethod(AdapterContext adapterContext, BuilderContext builderContext)
         {
-            ParameterInfo[] parameters = methodInfo.GetParameters();
-            Type[] methodArgs = parameters.Select(p => p.ParameterType).ToArray();
-            Type[] genericArguments = methodInfo.GetGenericArguments();
-
-            MethodBuilder methodBuilder =
-                context.TypeBuilder
+            MethodBuilder methodBuilder = adapterContext
+                .TypeBuilder
                 .DefineMethod(
-                    methodInfo.Name,
+                    builderContext.Method.Name,
                     MethodAttributes.Public |
                     MethodAttributes.Virtual,
-                    methodInfo.ReturnType,
-                    methodArgs);
+                    builderContext.MethodReturnType,
+                    builderContext.ParameterTypes);
 
             var genTypeBuilders = methodBuilder.DefineGenericParameters(
-                genericArguments.Select(t => t.Name).ToArray());
+                builderContext.GenericArguments.Select(t => t.Name).ToArray());
 
-            for (int i = 0; i < genericArguments.Length; i++)
+            for (int i = 0; i < builderContext.GenericArguments.Length; i++)
             {
                 genTypeBuilders[i].SetGenericParameterAttributes(
-                    genericArguments[i]
+                    builderContext.GenericArguments[i]
                         .GenericParameterAttributes
                 );
             }
@@ -466,11 +460,9 @@ namespace AutoAdapter
             ILGenerator methodIL = methodBuilder.GetILGenerator();
 
             this.BuildGenericMethod(
-                context,
-                methodInfo,
-                methodIL,
-                genericArguments,
-                parameters);
+                adapterContext,
+                builderContext,
+                methodIL);
 
             return methodBuilder;
         }
@@ -479,17 +471,14 @@ namespace AutoAdapter
         /// Builds a generic method.
         /// </summary>
         /// <param name="context">The current <see cref="AdapterContext"/.></param>
-        /// <param name="methodInfo">The current <see cref="MethodInfo"/>.</param>
+        /// <param name="builderContext">The current <see cref="BuilderContext"/>.</param>
         /// <param name="methodIL">The methods <see cref="ILGenerator"/>.</param>
-        /// <param name="genericArguments">The methods generic arguments.</param>
-        /// <param name="parameters">The methods parameters.</param>
         private void BuildGenericMethod(
             AdapterContext context,
-            MethodInfo methodInfo,
-            ILGenerator methodIL,
-            Type[] genericArguments,
-            ParameterInfo[] parameters)
+            BuilderContext builderContext,
+            ILGenerator methodIL)
         {
+            MethodInfo methodInfo = builderContext.Method;
             MethodInfo proxiedMethod = context.BaseType.GetSimilarMethod(methodInfo);
             if (proxiedMethod == null)
             {
@@ -522,7 +511,7 @@ namespace AutoAdapter
             MethodInfo makeGenericMethodImpl = typeof(MethodInfo).GetMethod("MakeGenericMethod", new Type[] { typeof(Type[]) });
             MethodInfo invokeMethod = typeof(MethodInfo).GetMethod("Invoke", new Type[] { typeof(object), typeof(object[]) });
 
-            methodIL.EmitTypeOf(genericArguments[0]);
+            methodIL.EmitTypeOf(builderContext.GenericArguments[0]);
             methodIL.Emit(OpCodes.Stloc_S, methodReturnType);
             methodIL.EmitWriteLine("Return Type:");
             methodIL.EmitWriteLine(methodReturnType);
@@ -542,13 +531,9 @@ namespace AutoAdapter
 
             methodIL.MarkLabel(labelAttributeFound);
 
-            //methodIL.EmitLoadArrayElem(methodReturnTypeAttrs, 0);
             methodIL.Emit(OpCodes.Ldloc_S, methodReturnTypeAttrs);
             methodIL.Emit(OpCodes.Ldc_I4_0);
             methodIL.Emit(OpCodes.Ldelem, methodReturnTypeAttrs.LocalType);
-
-                //.EmitLoadArrayElement(methodReturnTypeAttrs, 0)
-
             methodIL.Emit(OpCodes.Castclass, typeof(AdapterAttribute));
             methodIL.Emit(OpCodes.Stloc_S, adapterAttribute);
 
@@ -606,18 +591,18 @@ namespace AutoAdapter
             */
 
             // Build an arguments array.
-            if (parameters.Length > 0)
+            if (builderContext.Parameters.Length > 0)
             {
                 // Build the arguments array.
                 methodIL
                     .EmitArray(
                         typeof(object),
                         objectArray,
-                        parameters.Length,
+                        builderContext.Parameters.Length,
                         (index) =>
                         {
                             methodIL.Emit(OpCodes.Ldarg, index);
-                            methodIL.EmitConv(parameters[index].ParameterType, typeof(object), false);
+                            methodIL.EmitConv(builderContext.Parameters[index].ParameterType, typeof(object), false);
                         });
             }
             else
@@ -687,24 +672,24 @@ namespace AutoAdapter
         /// Builds a method
         /// </summary>
         /// <param name="adapterContext">The current <see cref="AdapterContext"/.></param>
-        /// <param name="methodContext">The current <see cref="MethodBuilderContext"/>.</param>
-        private MethodBuilder BuildMethod(AdapterContext adapterContext, MethodBuilderContext methodContext)
+        /// <param name="builderContext">The current <see cref="BuilderContext"/>.</param>
+        private MethodBuilder BuildMethod(AdapterContext adapterContext, BuilderContext builderContext)
         {
-            MethodAttributes attrs = methodContext.Method.Attributes & ~MethodAttributes.Abstract;
+            MethodAttributes attrs = builderContext.Method.Attributes & ~MethodAttributes.Abstract;
             var methodBuilder = adapterContext
                 .TypeBuilder
                 .DefineMethod(
-                    methodContext.Method.Name,
+                    builderContext.Method.Name,
                     attrs | MethodAttributes.Virtual,
-                    methodContext.Method.ReturnType,
-                    methodContext.ParameterTypes);
+                    builderContext.MethodReturnType,
+                    builderContext.ParameterTypes);
 
-            for (int i = 0; i < methodContext.Parameters.Length; i++)
+            for (int i = 0; i < builderContext.Parameters.Length; i++)
             {
                 methodBuilder.DefineParameter(
                     i + 1,
-                    methodContext.Parameters[i].Attributes,
-                    methodContext.Parameters[i].Name);
+                    builderContext.Parameters[i].Attributes,
+                    builderContext.Parameters[i].Name);
             }
 
             var methodIL = methodBuilder.GetILGenerator();
@@ -715,7 +700,7 @@ namespace AutoAdapter
             {
                 foreach (var extension in scope.GetServices<IAdapterFactoryExtension>())
                 {
-                    if (extension.ImplementMethod(methodContext.Method, methodIL, adapterContext) == true)
+                    if (extension.ImplementMethod(builderContext.Method, methodIL, adapterContext) == true)
                     {
                         implemented = true;
                         break;
@@ -725,11 +710,9 @@ namespace AutoAdapter
 
             if (implemented == false)
             {
-                methodContext.Method.AddTargetMethodDetailsToContext(adapterContext);
-
                 this.BuildMethod(
                     adapterContext,
-                    methodContext,
+                    builderContext,
                     methodIL);
             }
 
@@ -740,81 +723,80 @@ namespace AutoAdapter
         /// Implements a method.
         /// </summary>
         /// <param name="adapterContext">The adapter factories current context.</param>
-        /// <param name="methodContext">The <see cref="MethodInfo"/> of the method being implemented.</param>
+        /// <param name="builderContext">The <see cref="MethodInfo"/> of the method being implemented.</param>
         /// <param name="ilGen">The methods <see cref="ILGenerator"/>.</param>
         /// <param name="methodArgs">An array containing the methods argument types.</param>
         private void BuildMethod(
             AdapterContext adapterContext,
-            MethodBuilderContext methodContext,
+            BuilderContext builderContext,
             ILGenerator ilGen)
         {
             // Get the method being proxied.
-            //MethodInfo proxiedMethod = null;
-            if (adapterContext.TargetStaticType == null)
+            if (builderContext.TargetStaticType == null)
             {
-                methodContext.SetProxiedMethod(
+                builderContext.SetProxiedMethod(
                     adapterContext.BaseType,
-                    adapterContext.TargetMemberName,
+                    builderContext.TargetMemberName,
                     BindingFlags.Public | BindingFlags.Instance,
-                    methodContext.Parameters);
+                    builderContext.Parameters);
             }
             else
             {
-                methodContext.SetProxiedMethod(
-                    adapterContext.TargetStaticType,
-                    adapterContext.TargetMemberName,
+                builderContext.SetProxiedMethod(
+                    builderContext.TargetStaticType,
+                    builderContext.TargetMemberName,
                     BindingFlags.Public | BindingFlags.Static,
-                    methodContext.Parameters);
+                    builderContext.Parameters);
             }
 
             // Was a proxy method found?
-            if (methodContext.ProxiedMethod == null)
+            if (builderContext.ProxiedMethod == null)
             {
                 this.EmitMethodNotFoundProcessing(
                     adapterContext,
-                    methodContext.Method,
+                    builderContext,
                     ilGen);
 
                 return;
             }
 
-            Type proxiedReturnType = methodContext.ProxiedMethod.ReturnType;
+            Type proxiedReturnType = builderContext.ProxiedMethodReturnType;
 
-            LocalBuilder localMethodReturn = null;
-            LocalBuilder localProxiedReturn = null;
+            LocalBuilder methodReturnLocal = null;
+            LocalBuilder proxiedReturnLocal = null;
 
             // Does the method have a return type?
-            if (methodContext.Method.ReturnType != null &&
-                methodContext.Method.ReturnType != typeof(void))
+            if (builderContext.MethodReturnType != null &&
+                builderContext.MethodReturnType != typeof(void))
             {
                 // Check if the return value has an adapter attribute applied to it.
-                AdapterAttribute attr = methodContext.Method.ReturnType.GetCustomAttribute<AdapterAttribute>();
+                AdapterAttribute attr = builderContext.MethodReturnType.GetCustomAttribute<AdapterAttribute>();
                 if (attr != null)
                 {
                     proxiedReturnType = attr.GetAdaptedType();
                 }
 
                 // Declare locals
-                localMethodReturn = ilGen.DeclareLocal(methodContext.Method.ReturnType);
-                localProxiedReturn = ilGen.DeclareLocal(proxiedReturnType);
+                methodReturnLocal = ilGen.DeclareLocal(builderContext.MethodReturnType);
+                proxiedReturnLocal = ilGen.DeclareLocal(proxiedReturnType);
 
                 // hmm
                 // If this is a generic method changes it to a generic method of return type.
                 // This is NOT robust enough needs to only change the signature if the proxied return
                 // type is actual required in the generic definition.
-                if (methodContext.ProxiedMethod.IsGenericMethodDefinition == true)
+                if (builderContext.ProxiedMethod.IsGenericMethodDefinition == true)
                 {
-                    methodContext.MakeGenericProxiedMethod(proxiedReturnType);
+                    builderContext.MakeGenericProxiedMethod(proxiedReturnType);
                 }
             }
 
             // Is the proxied method static?
-            if (methodContext.ProxiedMethod.IsStatic == true)
+            if (builderContext.ProxiedMethod.IsStatic == true)
             {
                 // Is it an extension method?
-                if (methodContext.ProxiedMethod.IsDefined(typeof(ExtensionAttribute), false) == true)
+                if (builderContext.ProxiedMethod.IsDefined(typeof(ExtensionAttribute), false) == true)
                 {
-                    ParameterInfo[] extensionParms = methodContext.ProxiedParameters;
+                    ParameterInfo[] extensionParms = builderContext.ProxiedParameters;
                     if (extensionParms.Length > 0 &&
                         adapterContext.BaseType == extensionParms[0].ParameterType)
                     {
@@ -826,8 +808,8 @@ namespace AutoAdapter
 
                         ilGen.Emit(OpCodes.Ldarg_0);
                         ilGen.Emit(OpCodes.Ldfld, adapterContext.BaseObjectField);
-                        ilGen.EmitParameters(adapterContext, methodContext);
-                        ilGen.Emit(OpCodes.Call, methodContext.ProxiedMethod);
+                        ilGen.EmitParameters(adapterContext, builderContext);
+                        ilGen.Emit(OpCodes.Call, builderContext.ProxiedMethod);
                     }
                     else
                     {
@@ -838,8 +820,8 @@ namespace AutoAdapter
                 }
                 else
                 {
-                    ilGen.EmitParameters(adapterContext, methodContext);
-                    ilGen.Emit(OpCodes.Call, methodContext.ProxiedMethod);
+                    ilGen.EmitParameters(adapterContext, builderContext);
+                    ilGen.Emit(OpCodes.Call, builderContext.ProxiedMethod);
                 }
             }
             else
@@ -849,8 +831,8 @@ namespace AutoAdapter
                 {
                     ilGen.Emit(OpCodes.Ldarg_0);
                     ilGen.Emit(OpCodes.Ldfld, adapterContext.BaseObjectField);
-                    ilGen.EmitParameters(adapterContext, methodContext);
-                    ilGen.Emit(OpCodes.Callvirt, methodContext.ProxiedMethod);
+                    ilGen.EmitParameters(adapterContext, builderContext);
+                    ilGen.Emit(OpCodes.Callvirt, builderContext.ProxiedMethod);
                 }
 
                 // Is the adapted type a value type?
@@ -858,36 +840,34 @@ namespace AutoAdapter
                 {
                     ilGen.Emit(OpCodes.Ldarg_0);
                     ilGen.Emit(OpCodes.Ldflda, adapterContext.BaseObjectField);
-                    ilGen.EmitParameters(adapterContext, methodContext);
-                    ilGen.Emit(OpCodes.Call, methodContext.ProxiedMethod);
+                    ilGen.EmitParameters(adapterContext, builderContext);
+                    ilGen.Emit(OpCodes.Call, builderContext.ProxiedMethod);
                 }
             }
 
             // Does the method expect a return value?
-            if (localMethodReturn != null)
+            if (methodReturnLocal != null)
             {
                 // Store the value on the evaluation stack
                 // into a local variable.
-                ilGen.Emit(OpCodes.Stloc, localProxiedReturn);
+                ilGen.Emit(OpCodes.Stloc, proxiedReturnLocal);
             }
 
             // Emit any out parameters
-            methodContext.EmitOutParameters(ilGen);
+            builderContext.EmitOutParameters(ilGen);
 
             // Does the method expect a return value?
-            if (localMethodReturn != null)
+            if (methodReturnLocal != null)
             {
                 // Emit return value handling.
                 this.EmitReturnValueProcessing(
-                    adapterContext,
-                    methodContext.Method,
+                    builderContext,
                     ilGen,
-                    proxiedReturnType,
-                    localProxiedReturn,
-                    localMethodReturn);
+                    proxiedReturnLocal,
+                    methodReturnLocal);
 
                 // Load the return value back onto the evaluation stack.
-                ilGen.Emit(OpCodes.Ldloc_S, localMethodReturn);
+                ilGen.Emit(OpCodes.Ldloc_S, methodReturnLocal);
             }
 
             // Return from the method.
@@ -897,174 +877,89 @@ namespace AutoAdapter
         /// <summary>
         /// Handles methods the return a value.
         /// </summary>
-        /// <param name="context">The current <see cref="AdapterContext"/>.</param>
-        /// <param name="methodInfo">The current <see cref="MethodInfo"/>.</param>
+        /// <param name="builderContext">The current <see cref="BuilderContext"/>.</param>
         /// <param name="ilGen">The current <see cref="ILGenerator"/>.</param>
-        /// <param name="proxiedReturnType">The proxy return type</param>
-        /// <param name="proxiedReturn">A <see cref="LocalBuilder"/> for the proxy return value.</param>
+        /// <param name="proxiedReturnLocal">A <see cref="LocalBuilder"/> for the proxy return value.</param>
+        /// <param name="methodReturnLocal">A <see cref="LocalBuilder"/> for the return value.</param>
         private void EmitReturnValueProcessing(
-            AdapterContext context,
-            MethodInfo methodInfo,
+            BuilderContext builderContext,
             ILGenerator ilGen,
-            Type proxiedReturnType,
-            LocalBuilder proxiedReturn,
-            LocalBuilder methodReturn)
+            LocalBuilder proxiedReturnLocal,
+            LocalBuilder methodReturnLocal)
         {
+            Type proxiedReturnType = proxiedReturnLocal.LocalType;
+            Type returnType = methodReturnLocal.LocalType;
+
             // Does the method have an adapter extension method applied?
-            if (context.ExtensionMethodName != null)
+            if (builderContext.ExtensionMethodName != null)
             {
                 // Emit the code to call the extension method.
                 ilGen.EmitAdapterExtensionExecution(
-                    context.ExtensionMethodName,
+                    builderContext.ExtensionMethodName,
                     proxiedReturnType,
                     proxiedReturnType,
-                    context,
-                    proxiedReturn,
-                    proxiedReturn);
+                    builderContext.AdapterContext,
+                    proxiedReturnLocal,
+                    proxiedReturnLocal);
             }
-
-            ilGen.Emit(OpCodes.Ldloc, proxiedReturn);
 
             // Do the return types match?
-            if (methodInfo.ReturnType != proxiedReturnType)
+            if (returnType != proxiedReturnType)
             {
-                // Is the return type an enum?
-                if (methodInfo.ReturnType.IsEnum == true)
-                {
-                    ilGen.Emit(OpCodes.Conv_I4);
-                }
-
-                // Is the return type an array.
-                else if (methodInfo.ReturnType.IsArray == true)
-                {
-                    if (methodInfo.ReturnType.GetElementType().IsInterface == false)
-                    {
-                        throw new AdapterGenerationException("Returns types do not match and cannot be adapted");
-                    }
-
-                    Type returnType = methodInfo.ReturnType.GetElementType();
-                    Type proxiedType = proxiedReturnType.GetElementType();
-
-                    ConstructorInfo adapterCtor = context.GetAdapterConstructor(proxiedType, returnType);
-                    if (adapterCtor == null)
-                    {
-                        throw new AdapterGenerationException("Constructor not found");
-                    }
-
-                    Label labelStart = ilGen.DefineLabel();
-                    Label labelEnd = ilGen.DefineLabel();
-
-                    LocalBuilder returnArray = ilGen.DeclareLocal(methodInfo.ReturnType);
-
-                    // If null then exit...
-                    ilGen.Emit(OpCodes.Brtrue_S, labelStart);
-                    ilGen.Emit(OpCodes.Ldnull);
-                    ilGen.Emit(OpCodes.Br_S, labelEnd);
-
-                    ilGen.MarkLabel(labelStart);
-                    ilGen.Emit(OpCodes.Nop);
-                    ilGen.Emit(OpCodes.Ldloc_S, proxiedReturn);
-
-                    ilGen.Emit(OpCodes.Ldlen);
-                    ilGen.Emit(OpCodes.Conv_I4);
-                    ilGen.Emit(OpCodes.Newarr, returnType);
-                    ilGen.Emit(OpCodes.Stloc_S, returnArray);
-
-                    ilGen.EmitFor(
-                        returnArray,
-                        (index) =>
-                        {
-                            ilGen.Emit(OpCodes.Ldloc_S, proxiedReturn);
-                            ilGen.Emit(OpCodes.Ldloc_S, index);
-                            ilGen.Emit(OpCodes.Ldelem_Ref);
-                            ilGen.Emit(OpCodes.Ldarg_0);
-                            ilGen.Emit(OpCodes.Ldfld, context.ServiceProviderField);
-                            ilGen.Emit(OpCodes.Newobj, adapterCtor);
-                            ilGen.Emit(OpCodes.Stelem_Ref);
-                        });
-
-                    ilGen.Emit(OpCodes.Ldloc_S, returnArray);
-                    ilGen.MarkLabel(labelEnd);
-                }
-
-                // Is the return type an interface?
-                else if (methodInfo.ReturnType.IsInterface == true)
-                {
-                    if (proxiedReturnType.IsGenericParameter == true)
-                    {
-                        throw new AdapterGenerationException("Unable to determine the type to adapt.");
-                    }
-
-                    // If there is a target type set then use that instead of the proxied type.
-                    context.TargetType = context.TargetType ?? proxiedReturnType;
-
-                    ConstructorInfo adapterCtor = context.GetAdapterConstructor(context.TargetType, methodInfo.ReturnType);
-
-                    Label notNull = ilGen.DefineLabel();
-                    Label done = ilGen.DefineLabel();
-
-                    // Check if the adapter type has been created.
-                    ilGen.Emit(OpCodes.Brtrue_S, notNull);
-                    ilGen.Emit(OpCodes.Nop);
-                    ilGen.Emit(OpCodes.Ldnull);
-                    ilGen.Emit(OpCodes.Br_S, done);
-
-                    // Push the arguments onto the evaluation stack.
-                    ilGen.MarkLabel(notNull);
-                    ilGen.Emit(OpCodes.Ldloc_S, proxiedReturn);
-                    ilGen.Emit(OpCodes.Ldarg_0);
-                    ilGen.Emit(OpCodes.Ldfld, context.ServiceProviderField);
-
-                    // Construct an instance of the adapter.
-                    ilGen.Emit(OpCodes.Newobj, adapterCtor);
-                    ilGen.MarkLabel(done);
-                }
-                else
-                {
-                    throw new AdapterGenerationException("The return types do not match or cannot be adapted");
-                }
+                ilGen.EmitAdaptedResult(
+                    builderContext,
+                    proxiedReturnLocal,
+                    returnType);
+            }
+            else
+            {
+                ilGen.Emit(OpCodes.Ldloc, proxiedReturnLocal);
             }
 
-            // Store the value on the top of the execution stack into the return value variable.
-            ilGen.Emit(OpCodes.Stloc_S, methodReturn);
+            // Store the value on the top of the execution stack
+            // into the return value variable.
+            ilGen.Emit(OpCodes.Stloc_S, methodReturnLocal);
         }
 
         /// <summary>
         /// Handles various scenarios when a proxiable method is not found.
         /// </summary>
-        /// <param name="context">The current <see cref="AdapterContext"/>.</param>
-        /// <param name="methodInfo">The current <see cref="MethodInfo"/>.</param>
+        /// <param name="adapterContext">The current <see cref="AdapterContext"/>.</param>
+        /// <param name="builderContext">The current <see cref="BuilderContext"/>.</param>
         /// <param name="ilGen">The current <see cref="ILGenerator"/>.</param>
-        private void EmitMethodNotFoundProcessing(AdapterContext context, MethodInfo methodInfo, ILGenerator ilGen)
+        private void EmitMethodNotFoundProcessing(
+            AdapterContext adapterContext,
+            BuilderContext builderContext,
+            ILGenerator ilGen)
         {
             // No method found
-
+            MethodInfo methodInfo = builderContext.Method;
             FieldInfo field = null;
 
             // Is the desired method is a property getter and
             // is there a public field with same name?
             if (methodInfo.IsPropertyGet() == true &&
-                (field = context.BaseType.GetField(methodInfo.Name.Substring(4))) != null)
+                (field = adapterContext.BaseType.GetField(methodInfo.Name.Substring(4))) != null)
             {
-                LocalBuilder sourceValue = ilGen.DeclareLocal(context.BaseType);
+                LocalBuilder sourceValue = ilGen.DeclareLocal(adapterContext.BaseType);
                 LocalBuilder fieldValue = ilGen.DeclareLocal(field.FieldType);
                 LocalBuilder returnValue = ilGen.DeclareLocal(methodInfo.ReturnType);
 
                 ilGen.Emit(OpCodes.Ldarg_0);
-                ilGen.Emit(OpCodes.Ldfld, context.BaseObjectField);
+                ilGen.Emit(OpCodes.Ldfld, adapterContext.BaseObjectField);
                 ilGen.Emit(OpCodes.Stloc_S, sourceValue);
 
                 ilGen.Emit(OpCodes.Ldloc_S, sourceValue);
                 ilGen.Emit(OpCodes.Ldfld, field);
                 ilGen.Emit(OpCodes.Stloc_S, fieldValue);
 
-                if (context.ExtensionMethodName != null)
+                if (builderContext.ExtensionMethodName != null)
                 {
                     ilGen.EmitAdapterExtensionExecution(
-                            context.ExtensionMethodName,
-                            context.BaseType,
+                            builderContext.ExtensionMethodName,
+                            adapterContext.BaseType,
                             methodInfo.ReturnType,
-                            context,
+                            adapterContext,
                             fieldValue,
                             returnValue);
 
@@ -1073,9 +968,10 @@ namespace AutoAdapter
                 }
                 else if (field.FieldType != methodInfo.ReturnType)
                 {
-                    ilGen.Emit(OpCodes.Ldloc_S, fieldValue);
-                    ilGen.Emit(OpCodes.Castclass, methodInfo.ReturnType);
-                    ilGen.Emit(OpCodes.Ldloc_S, returnValue);
+                    ilGen.EmitAdaptedResult(
+                        builderContext,
+                        fieldValue,
+                        methodInfo.ReturnType);
                 }
                 else
                 {
@@ -1085,13 +981,14 @@ namespace AutoAdapter
                 ilGen.Emit(OpCodes.Ret);
             }
 
-            // Is the desired method is a property setter and
+            // Is the desired method a property setter and
             // is there a public field with same name?
             else if (methodInfo.IsPropertySet() == true &&
-                (field = context.BaseType.GetField(methodInfo.Name.Substring(4))) != null)
+                (field = adapterContext.BaseType.GetField(methodInfo.Name.Substring(4))) != null)
             {
+                // TODO: Look at adpated types
                 ilGen.Emit(OpCodes.Ldarg_0);
-                ilGen.Emit(OpCodes.Ldfld, context.BaseObjectField);
+                ilGen.Emit(OpCodes.Ldfld, adapterContext.BaseObjectField);
 
                 ilGen.Emit(OpCodes.Ldarg_1);
                 ilGen.Emit(OpCodes.Stfld, field);
@@ -1100,21 +997,21 @@ namespace AutoAdapter
 
             // Does the desired method have a return type and does it
             // have an adapter extension method applied?
-            else if (context.ExtensionMethodName != null &&
+            else if (builderContext.ExtensionMethodName != null &&
                 methodInfo.ReturnType != typeof(void))
             {
-                LocalBuilder sourceValue = ilGen.DeclareLocal(context.BaseType);
+                LocalBuilder sourceValue = ilGen.DeclareLocal(adapterContext.BaseType);
                 LocalBuilder returnValue = ilGen.DeclareLocal(methodInfo.ReturnType);
 
                 ilGen.Emit(OpCodes.Ldarg_0);
-                ilGen.Emit(OpCodes.Ldfld, context.BaseObjectField);
+                ilGen.Emit(OpCodes.Ldfld, adapterContext.BaseObjectField);
                 ilGen.Emit(OpCodes.Stloc_S, sourceValue);
 
                 ilGen.EmitAdapterExtensionExecution(
-                        context.ExtensionMethodName,
-                        context.BaseType,
+                        builderContext.ExtensionMethodName,
+                        adapterContext.BaseType,
                         methodInfo.ReturnType,
-                        context,
+                        adapterContext,
                         sourceValue,
                         returnValue);
 

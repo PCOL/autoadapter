@@ -135,7 +135,9 @@ namespace AutoAdapter
         /// </summary>
         /// <param name="extensionName">The name of the extension.</param>
         /// <returns>An <see cref="IAdapterExtension{T, TResult}"/> if found; otherwise null.</returns>
-        internal static IAdapterExtension<T, TResult> GetAdapterExtension<T, TResult>(this IServiceProvider serviceProvider, string extensionName)
+        internal static IAdapterExtension<T, TResult> GetAdapterExtension<T, TResult>(
+            this IServiceProvider serviceProvider,
+            string extensionName)
         {
             var adapters = serviceProvider.GetServices<IAdapterExtension<T, TResult>>();
             if (adapters != null)
@@ -211,106 +213,6 @@ namespace AutoAdapter
             propertyAdaptedObject.SetGetMethod(getAdaptedObject);
 
             return typeBuilder;
-        }
-
-        /// <summary>
-        /// Adds the target property details to the <see cref="AdapterContext"/>.
-        /// </summary>
-        /// <param name="propertyInfo">A <see cref="PropertyInfo"/> instance.</param>
-        /// <param name="context">The <see cref="AdapterContext"/> to update.</param>
-        internal static void AddTargetPropertyDetailsToContext(this PropertyInfo propertyInfo, AdapterContext context)
-        {
-            context.TargetMemberName = propertyInfo.Name;
-
-            // Check for a property extension attribute.
-            AdapterExtensionAttribute adapterAttr = propertyInfo.GetCustomAttribute<AdapterExtensionAttribute>();
-            if (adapterAttr != null)
-            {
-                context.ExtensionMethodName = adapterAttr.ExtensionName;
-            }
-
-            var adapterImpl = propertyInfo.GetCustomAttribute<AdapterImplAttribute>();
-            if (adapterImpl != null)
-            {
-                string attrTargetName = adapterImpl.GetMemberTargetName(
-                    out Type targetStaticType,
-                    out TargetMemberType targetMemberType,
-                    out Type targetType);
-
-                if (targetMemberType == TargetMemberType.Property ||
-                    targetMemberType == TargetMemberType.NotSet)
-                {
-                    context.TargetMemberName =
-                        attrTargetName.IsNullOrEmpty() == false ?
-                        propertyInfo.Name + attrTargetName :
-                        context.TargetMemberName;
-                }
-                else if (targetMemberType == TargetMemberType.Method)
-                {
-                    context.TargetMemberName =
-                        attrTargetName.IsNullOrEmpty() == false ?
-                        attrTargetName :
-                        context.TargetMemberName;
-                }
-
-                context.TargetType = targetType;
-                context.TargetStaticType = targetStaticType;
-            }
-        }
-
-        /// <summary>
-        /// Adds the target methods details to the <see cref="AdapterContext"/>.
-        /// </summary>
-        /// <param name="methodInfo">A <see cref="MethodInfo"/> instance.</param>
-        /// <param name="context">The <see cref="AdapterContext"/> to update.</param>
-        internal static void AddTargetMethodDetailsToContext(this MethodInfo methodInfo, AdapterContext context)
-        {
-            MemberInfo memberInfo = methodInfo;
-            if (methodInfo.IsProperty() == true)
-            {
-                memberInfo = methodInfo.GetProperty();
-            }
-
-            context.TargetMemberName = methodInfo.Name;
-
-            // Check for a return type extension attribute.
-            object[] adapterAttrs = methodInfo
-                .ReturnTypeCustomAttributes
-                .GetCustomAttributes(typeof(AdapterExtensionAttribute), false);
-
-            if (adapterAttrs != null &&
-                adapterAttrs.Any() == true)
-            {
-                context.ExtensionMethodName = ((AdapterExtensionAttribute)adapterAttrs.First()).ExtensionName;
-            }
-
-            var adapterImpl = memberInfo.GetCustomAttribute<AdapterImplAttribute>();
-            if (adapterImpl != null)
-            {
-                string attrTargetName =adapterImpl.GetMemberTargetName(
-                    out Type targetStaticType,
-                    out TargetMemberType targetMemberType,
-                    out Type targetType);
-
-                if (targetMemberType == TargetMemberType.Property)
-                {
-                    context.TargetMemberName =
-                        attrTargetName.IsNullOrEmpty() == false ?
-                        methodInfo.Name.Substring(0, 4) + attrTargetName :
-                        context.TargetMemberName;
-                }
-                else if (targetMemberType == TargetMemberType.Method ||
-                    targetMemberType == TargetMemberType.NotSet)
-                {
-                    context.TargetMemberName =
-                        attrTargetName.IsNullOrEmpty() == false ?
-                        attrTargetName :
-                        context.TargetMemberName;
-                }
-
-                context.TargetType = targetType;
-                context.TargetStaticType = targetStaticType;
-            }
         }
     }
 }
