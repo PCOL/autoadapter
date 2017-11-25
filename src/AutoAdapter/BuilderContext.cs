@@ -29,6 +29,7 @@ namespace AutoAdapter
     using System.Linq;
     using System.Reflection;
     using System.Reflection.Emit;
+    using System.Runtime.CompilerServices;
     using AutoAdapter.Extensions;
     using AutoAdapter.Reflection;
 
@@ -145,6 +146,16 @@ namespace AutoAdapter
         /// Gets or sets the target static type.
         /// </summary>
         public Type TargetStaticType { get; set; }
+
+        /// <summary>
+        /// Gets a value indicating whether or not the proxied method is static
+        /// </summary>
+        public bool IsStatic { get; private set; }
+
+        /// <summary>
+        /// Gets a value indicating whether or not the proxied method is an extension method.
+        /// </summary>
+        public bool IsExtension { get; private set; }
 
         /// <summary>
         /// Gets the methods out parameter locals.
@@ -267,9 +278,12 @@ namespace AutoAdapter
                     bindingFlags,
                     parameters);
 
+            this.IsStatic = (bindingFlags & BindingFlags.Static) != 0;
+
             if (this.ProxiedMethod != null)
             {
                 this.ProxiedParameters = this.ProxiedMethod.GetParameters();
+                this.IsExtension = this.ProxiedMethod.IsDefined(typeof(ExtensionAttribute));
             }
 
             return this.ProxiedMethod;

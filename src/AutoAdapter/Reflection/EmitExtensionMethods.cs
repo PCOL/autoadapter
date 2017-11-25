@@ -362,20 +362,18 @@ namespace AutoAdapter.Reflection
         internal static ILGenerator EmitParameters(
             this ILGenerator ilGen,
             AdapterContext context,
-            BuilderContext builderContext,
-            bool staticMethod = false)
+            BuilderContext builderContext)
         {
-            for (int i = 0; i < builderContext.Parameters.Length; i++)
-            {
-                int argIndex = i;
-                if (staticMethod == false)
-                {
-                    argIndex++;
-                }
+            int argStart = builderContext.IsStatic == false || builderContext.IsExtension == true ? 1 : 0;
+            int proxiedstart = builderContext.IsExtension == true ? 1 : 0;
 
+            for (int i = 0, argIndex = argStart, proxiedIndex = proxiedstart;
+                i < builderContext.Parameters.Length;
+                i++, argIndex++, proxiedIndex++)
+            {
                 var parm = builderContext.Parameters[i];
                 var parmType = parm.ParameterType;
-                var proxiedParm = builderContext.ProxiedParameters[i];
+                var proxiedParm = builderContext.ProxiedParameters[proxiedIndex];
                 var proxiedParmType = proxiedParm.ParameterType;
 
                 // Does the parameter have and an adapter extension applied?
@@ -438,7 +436,7 @@ namespace AutoAdapter.Reflection
                     // The parameter types do not match so we need to convert the parameter
 
                     // Is this an out/ref parameter?
-                    if (parmType.IsByRef == true &&
+                    if (parm.IsOut == true &&
                         parmType.GetElementType().IsInterface == true)
                     {
                         Type proxiedType = proxiedParmType.GetElementType();

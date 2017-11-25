@@ -673,7 +673,9 @@ namespace AutoAdapter
         /// </summary>
         /// <param name="adapterContext">The current <see cref="AdapterContext"/.></param>
         /// <param name="builderContext">The current <see cref="BuilderContext"/>.</param>
-        private MethodBuilder BuildMethod(AdapterContext adapterContext, BuilderContext builderContext)
+        private MethodBuilder BuildMethod(
+            AdapterContext adapterContext,
+            BuilderContext builderContext)
         {
             MethodAttributes attrs = builderContext.Method.Attributes & ~MethodAttributes.Abstract;
             var methodBuilder = adapterContext
@@ -810,6 +812,8 @@ namespace AutoAdapter
                         ilGen.Emit(OpCodes.Ldfld, adapterContext.BaseObjectField);
                         ilGen.EmitParameters(adapterContext, builderContext);
                         ilGen.Emit(OpCodes.Call, builderContext.ProxiedMethod);
+
+                        // TODO: Does the result need to be adapted?
                     }
                     else
                     {
@@ -1020,8 +1024,6 @@ namespace AutoAdapter
             }
             else
             {
-                Console.WriteLine("Method: {0} - Not Implemented", methodInfo.Name);
-
                 // Unable to implement the desired method.
                 ilGen.ThrowException(typeof(NotImplementedException));
             }

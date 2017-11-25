@@ -279,14 +279,14 @@ namespace AutoAdapter.Reflection
                 var extensionTypes = type
                     .Assembly
                     .GetTypes()
-                    .Where((t) => t.IsSealed && !t.IsGenericType && !t.IsNested).ToArray();
+                    .Where((t) => t.IsSealed && !t.IsGenericType && !t.IsNested);
 
                 foreach (var extensionType in extensionTypes)
                 {
                     methodInfos = extensionType
-                        .GetMethods(bindingFlags).Where(m => m.Name == name).ToArray();
+                        .GetMethods(bindingFlags).Where(m => m.Name == name);
 
-                    if (!methodInfos.IsNullOrEmpty())
+                    if (methodInfos.IsNullOrEmpty() == false)
                     {
                         methodInfo = methodInfos.Select(
                             m => new
@@ -295,7 +295,12 @@ namespace AutoAdapter.Reflection
                                 Parms = m.GetParameters(),
                                 Args = m.GetGenericArguments()
                             })
-                            .Where(x => x.Method.IsDefined(typeof(ExtensionAttribute), false) && x.Parms[0].ParameterType == type && ParameterTypesMatchOrAttribute(x.Parms, 1, parameters, 0, parameters.Length, attributeType))
+                            .Where(x =>
+                            {
+                                return x.Method.IsDefined(typeof(ExtensionAttribute), false) &&
+                                    //x.Parms[0].ParameterType == type &&
+                                    ParameterTypesMatchOrAttribute(x.Parms, 1, parameters, 0, parameters.Length, attributeType, true);
+                            })
                             .Select(x => x.Method)
                             .FirstOrDefault();
 
@@ -550,9 +555,9 @@ namespace AutoAdapter.Reflection
             return ParameterTypesMatchOrAttribute(source, 0, dest, 0, source.Length, attribute);
         }
 
-        private static bool ParameterTypesMatchOrAttribute(ParameterInfo[] source, int sourceIndex, ParameterInfo[] dest, int destIndex, int length, Type attribute = null)
+        private static bool ParameterTypesMatchOrAttribute(ParameterInfo[] source, int sourceIndex, ParameterInfo[] dest, int destIndex, int length, Type attribute = null, bool extension = false)
         {
-            if (source.Length != dest.Length)
+            if (source.Length != (dest.Length + (extension == false ? 0 : 1)))
             {
                return false;
             }
