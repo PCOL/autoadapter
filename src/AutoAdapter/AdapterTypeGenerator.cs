@@ -812,8 +812,6 @@ namespace AutoAdapter
                         ilGen.Emit(OpCodes.Ldfld, adapterContext.BaseObjectField);
                         ilGen.EmitParameters(adapterContext, builderContext);
                         ilGen.Emit(OpCodes.Call, builderContext.ProxiedMethod);
-
-                        // TODO: Does the result need to be adapted?
                     }
                     else
                     {

@@ -18,5 +18,16 @@ namespace AutoAdapterUnitTests.Resources
             return false;
         }
 
+        public bool TryGetChildren(out ChildAdaptee[] children)
+        {
+            children = null;
+            if (this.Children != null)
+            {
+                children = this.Children;
+                return true;
+            }
+
+            return false;
+        }
     }
 }

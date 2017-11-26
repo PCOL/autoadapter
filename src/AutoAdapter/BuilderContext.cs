@@ -343,6 +343,39 @@ namespace AutoAdapter
                         this.EmitAdaptedValue(ilGen, outParm.Value, localToValue);
                         ilGen.EmitStoreByRefArg(outParm.Key, localToValue);
                     }
+                    else if (toType.IsArray == true)
+                    {
+                        Type fromElemType = outParm.Value.LocalType.GetElementType();
+                        Type toElemType = toType.GetElementType();
+
+                        LocalBuilder localToArray = ilGen.DeclareLocal(toType);
+                        LocalBuilder localToArrayLength = ilGen.DeclareLocal(typeof(int));
+
+                        ilGen.Emit(OpCodes.Ldloc, outParm.Value);
+                        ilGen.Emit(OpCodes.Ldlen);
+                        ilGen.Emit(OpCodes.Conv_I4);
+                        ilGen.Emit(OpCodes.Dup);
+                        ilGen.Emit(OpCodes.Stloc_S, localToArrayLength);
+                        ilGen.Emit(OpCodes.Newarr, toElemType);
+                        ilGen.Emit(OpCodes.Stloc, localToArray);
+
+                        ilGen.EmitFor(
+                            localToArrayLength,
+                            (index) =>
+                            {
+                                ilGen.Emit(OpCodes.Ldloc, localToArray);
+                                ilGen.Emit(OpCodes.Ldloc, index);
+
+                                ilGen.Emit(OpCodes.Ldloc, outParm.Value);
+                                ilGen.Emit(OpCodes.Ldloc, index);
+                                ilGen.Emit(OpCodes.Ldelem_Ref);
+                                this.EmitAdaptedValue(ilGen, fromElemType, toElemType);
+
+                                ilGen.Emit(OpCodes.Stelem_Ref);
+                            });
+
+                        ilGen.EmitStoreByRefArg(outParm.Key, localToArray);
+                    }
                 }
                 else
                 {

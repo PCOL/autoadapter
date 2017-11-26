@@ -356,7 +356,7 @@ namespace AutoAdapter.Reflection
         /// <param name="adpaterContext">The current adapter factory context.</param>
         /// <param name="builderContext">The <see cref="BuilderContext"/> of the method being implemented.</param>
         /// <param name="parameters">The parameters of the method being implemented.</param>
-        /// <param name="proxiedParameters">The parameters of the proxeid method.</param>
+        /// <param name="proxiedParameters">The parameters of the proxied method.</param>
         /// <param name="context">The current adapter factory context.</param>
         /// <param name="staticMethod">A value indicating whether or not the method is static.</param>
         internal static ILGenerator EmitParameters(
@@ -438,6 +438,15 @@ namespace AutoAdapter.Reflection
                     // Is this an out/ref parameter?
                     if (parm.IsOut == true &&
                         parmType.GetElementType().IsInterface == true)
+                    {
+                        Type proxiedType = proxiedParmType.GetElementType();
+                        LocalBuilder parmValue = ilGen.DeclareLocal(proxiedType);
+                        ilGen.Emit(OpCodes.Ldloca, parmValue);
+                        builderContext.AddOutParameter(argIndex, parmValue);
+                    }
+                    else if (parm.IsOut == true &&
+                        parmType.GetElementType().IsArray == true &&
+                        parmType.GetElementType().GetElementType().IsInterface == true)
                     {
                         Type proxiedType = proxiedParmType.GetElementType();
                         LocalBuilder parmValue = ilGen.DeclareLocal(proxiedType);
@@ -538,20 +547,27 @@ namespace AutoAdapter.Reflection
                 Type proxiedElementType = proxiedReturnType.GetElementType();
 
                 LocalBuilder returnArray = ilGen.DeclareLocal(returnType);
+                LocalBuilder returnArrayLength = ilGen.DeclareLocal(typeof(int));
 
                 ilGen.Emit(OpCodes.Ldlen);
                 ilGen.Emit(OpCodes.Conv_I4);
+                ilGen.Emit(OpCodes.Dup);
+                ilGen.Emit(OpCodes.Stloc_S, returnArrayLength);
                 ilGen.Emit(OpCodes.Newarr, returnElementType);
                 ilGen.Emit(OpCodes.Stloc_S, returnArray);
 
                 ilGen.EmitFor(
-                    returnArray,
+                    returnArrayLength,
                     (index) =>
                     {
-                        ilGen.Emit(OpCodes.Ldloc_S, sourceLocal);
+                        ilGen.Emit(OpCodes.Ldloc_S, returnArray);
+                        ilGen.Emit(OpCodes.Ldloc_S, index);
+
+                        ilGen.Emit(OpCodes.Ldloc, sourceLocal);
                         ilGen.Emit(OpCodes.Ldloc_S, index);
                         ilGen.Emit(OpCodes.Ldelem_Ref);
                         builderContext.EmitAdaptedValue(ilGen, proxiedElementType, returnElementType);
+
                         ilGen.Emit(OpCodes.Stelem_Ref);
                     });
 
@@ -933,9 +949,12 @@ namespace AutoAdapter.Reflection
         /// Emits IL to perform a for loop over an array without element loading.
         /// </summary>
         /// <param name="ilGen">An IL generator.</param>
-        /// <param name="localArray">The local variable holding the array.</param>
+        /// <param name="localLength">The local variable holding the length.</param>
         /// <param name="action">An action to allow the injecting of the loop code.</param>
-        public static ILGenerator EmitFor(this ILGenerator ilGen, LocalBuilder localArray, Action<LocalBuilder> action)
+        public static ILGenerator EmitFor(
+            this ILGenerator ilGen,
+            LocalBuilder localLength,
+            Action<LocalBuilder> action)
         {
             Label beginLoop = ilGen.DefineLabel();
             Label loopCheck = ilGen.DefineLabel();
@@ -943,12 +962,9 @@ namespace AutoAdapter.Reflection
             LocalBuilder index = ilGen.DeclareLocal(typeof(int));
 
             ilGen.Emit(OpCodes.Ldc_I4_0);
-            ilGen.Emit(OpCodes.Stloc_S, index);
+            ilGen.Emit(OpCodes.Stloc, index);
             ilGen.Emit(OpCodes.Br, loopCheck);
             ilGen.MarkLabel(beginLoop);
-
-            ilGen.Emit(OpCodes.Ldloc, localArray);
-            ilGen.Emit(OpCodes.Ldloc, index);
 
             action(index);
 
@@ -956,14 +972,12 @@ namespace AutoAdapter.Reflection
             ilGen.Emit(OpCodes.Ldloc, index);
             ilGen.Emit(OpCodes.Ldc_I4_1);
             ilGen.Emit(OpCodes.Add);
-            ilGen.Emit(OpCodes.Stloc_S, index);
+            ilGen.Emit(OpCodes.Stloc, index);
 
             ilGen.MarkLabel(loopCheck);
-            ilGen.Emit(OpCodes.Ldloc_S, index);
-            ilGen.Emit(OpCodes.Ldloc, localArray);
-            ilGen.Emit(OpCodes.Ldlen);
-            ilGen.Emit(OpCodes.Conv_I4);
-            ilGen.Emit(OpCodes.Blt_S, beginLoop);
+            ilGen.Emit(OpCodes.Ldloc, index);
+            ilGen.Emit(OpCodes.Ldloc, localLength);
+            ilGen.Emit(OpCodes.Blt, beginLoop);
 
             return ilGen;
         }
@@ -974,19 +988,30 @@ namespace AutoAdapter.Reflection
         /// <param name="ilGen">An IL generator.</param>
         /// <param name="localArray">The local variable holding the array.</param>
         /// <param name="action">An action to allow the injecting of the loop code.</param>
-        public static ILGenerator EmitFor(this ILGenerator ilGen, LocalBuilder localArray, Action<LocalBuilder, LocalBuilder> action)
+        public static ILGenerator EmitFor(
+            this ILGenerator ilGen,
+            LocalBuilder localArray,
+            Action<LocalBuilder, LocalBuilder> action)
         {
-            LocalBuilder item = ilGen.DeclareLocal(localArray.LocalType.GetElementType());
+            LocalBuilder itemLocal = ilGen.DeclareLocal(localArray.LocalType.GetElementType());
+            LocalBuilder lengthLocal = ilGen.DeclareLocal(typeof(int));
+
+            ilGen.Emit(OpCodes.Ldloc, localArray);
+            ilGen.Emit(OpCodes.Ldlen);
+            ilGen.Emit(OpCodes.Conv_I4);
+            ilGen.Emit(OpCodes.Stloc_S, lengthLocal);
 
             return ilGen.EmitFor(
-                localArray,
+                lengthLocal,
                 (index) =>
                 {
+                    ilGen.Emit(OpCodes.Ldloc, localArray);
+                    ilGen.Emit(OpCodes.Ldloc, index);
                     ilGen.Emit(OpCodes.Ldelem_Ref);
-                    ilGen.Emit(OpCodes.Stloc_S, item);
+                    ilGen.Emit(OpCodes.Stloc, itemLocal);
                     ilGen.Emit(OpCodes.Nop);
 
-                    action(index, item);
+                    action(index, itemLocal);
                 });
         }
     }

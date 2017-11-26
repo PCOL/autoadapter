@@ -9,5 +9,7 @@ namespace AutoAdapterUnitTests.Resources
         IChildAdapter[] Children { get; }
 
         bool TryGetChild(out IChildAdapter child);
+
+        bool TryGetChildren(out IChildAdapter[] children);
     }
 }
