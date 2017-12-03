@@ -79,7 +79,6 @@ namespace AutoAdapter
         /// <summary>
         /// Gets the <see cref="MemberInfo"/>.
         /// </summary>
-        /// <returns></returns>
         public MemberInfo Member { get; }
 
         /// <summary>
@@ -160,13 +159,12 @@ namespace AutoAdapter
         /// <summary>
         /// Gets the methods out parameter locals.
         /// </summary>
-        public Dictionary<int, LocalBuilder> OutParameters { get; private set; }
+        public Dictionary<int, LocalBuilder> OutParameters { get; set; }
 
         /// <summary>
         /// Adds the target property details to the <see cref="BuilderContext"/>.
         /// </summary>
         /// <param name="propertyInfo">A <see cref="PropertyInfo"/> instance.</param>
-        /// <param name="builderContext">The <see cref="BuilderContext"/> to update.</param>
         private void AddTargetPropertyDetailsToContext(
             PropertyInfo propertyInfo)
         {
@@ -212,7 +210,6 @@ namespace AutoAdapter
         /// Adds the target methods details to the <see cref="BuilderContext"/>.
         /// </summary>
         /// <param name="methodInfo">A <see cref="MethodInfo"/> instance.</param>
-        /// <param name="builderContext">The <see cref="BuilderContext"/> to update.</param>
         private void AddTargetMethodDetailsToContext(
             MethodInfo methodInfo)
         {
@@ -267,14 +264,18 @@ namespace AutoAdapter
         /// <summary>
         /// Sets the proxied method.
         /// </summary>
+        /// <param name="baseType">The base type containing the proxied method.</param>
+        /// <param name="methodName">The name of the method to proxy.</param>
+        /// <param name="bindingFlags">The binding flags used to find the method.</param>
+        /// <param name="parameters">The methods required parameters.</param>
         public MethodInfo SetProxiedMethod(
             Type baseType,
-            string targetName,
+            string methodName,
             BindingFlags bindingFlags,
             ParameterInfo[] parameters)
         {
             this.ProxiedMethod = baseType.GetMethodWithParameters(
-                    targetName,
+                    methodName,
                     bindingFlags,
                     parameters);
 
@@ -340,7 +341,7 @@ namespace AutoAdapter
                     else if (toType.IsInterface == true)
                     {
                         LocalBuilder localToValue = ilGen.DeclareLocal(toType);
-                        this.EmitAdaptedValue(ilGen, outParm.Value, localToValue);
+                        ilGen.EmitAdaptedValue(this.AdapterContext, outParm.Value, localToValue);
                         ilGen.EmitStoreByRefArg(outParm.Key, localToValue);
                     }
                     else if (toType.IsArray == true)
@@ -369,7 +370,7 @@ namespace AutoAdapter
                                 ilGen.Emit(OpCodes.Ldloc, outParm.Value);
                                 ilGen.Emit(OpCodes.Ldloc, index);
                                 ilGen.Emit(OpCodes.Ldelem_Ref);
-                                this.EmitAdaptedValue(ilGen, fromElemType, toElemType);
+                                ilGen.EmitAdaptedValue(this.AdapterContext, fromElemType, toElemType);
 
                                 ilGen.Emit(OpCodes.Stelem_Ref);
                             });
@@ -382,52 +383,6 @@ namespace AutoAdapter
                     ilGen.EmitStoreByRefArg(outParm.Key, outParm.Value);
                 }
             }
-        }
-
-        /// <summary>
-        /// Emits IL to generate an adapted value.
-        /// </summary>
-        /// <param name="ilGen">The <see cref="ILGenerator"/> to use.</param>
-        /// <param name="localSourceValue">A <see cref="LocalBuilder"/> containing the source value.</param>
-        /// <param name="localAdaptedValue">A <see cref="LocalBuilder"/> to receive the adapted value.</param>
-        public void EmitAdaptedValue(
-            ILGenerator ilGen,
-            LocalBuilder localSourceValue,
-            LocalBuilder localAdaptedValue)
-        {
-            Type sourceType  = localSourceValue.LocalType;
-            Type adaptedType = localAdaptedValue.LocalType;
-
-            ilGen.Emit(OpCodes.Ldloc, localSourceValue);
-            this.EmitAdaptedValue(
-                ilGen,
-                sourceType,
-                adaptedType);
-            ilGen.Emit(OpCodes.Stloc, localAdaptedValue);
-        }
-
-        /// <summary>
-        /// Emits IL to generate an adapted value.
-        /// </summary>
-        /// <param name="ilGen">The <see cref="ILGenerator"/> to use.</param>
-        /// <param name="localSourceValue">A <see cref="LocalBuilder"/> containing the source value.</param>
-        /// <param name="localAdaptedValue">A <see cref="LocalBuilder"/> to receive the adapted value.</param>
-        public void EmitAdaptedValue(
-            ILGenerator ilGen,
-            Type sourceType,
-            Type adaptedType)
-        {
-            var adapterCtor = this.AdapterContext.GetAdapterConstructor(sourceType, adaptedType);
-            if (adapterCtor == null)
-            {
-                throw new AdapterGenerationException("Unable to create adapter");
-            }
-
-            // Construct an instance of the adapter.
-            ilGen.Emit(OpCodes.Ldarg_0);
-            ilGen.Emit(OpCodes.Ldfld, this.AdapterContext.ServiceProviderField);
-            ilGen.Emit(OpCodes.Newobj, adapterCtor);
-            ilGen.Emit(OpCodes.Castclass, adaptedType);
         }
     }
 }

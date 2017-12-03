@@ -88,6 +88,30 @@ namespace AutoAdapter
         }
 
         /// <summary>
+        /// Creates an adapter.
+        /// </summary>
+        /// <typeparam name="T">The adapter type.</typeparam>
+        /// <param name="instance">The instance being adapted</param>
+        /// <param name="adapterType">The adapter type</param>
+        /// <param name="serviceProvider">Optional service provider instance.</param>
+        /// <returns>An instance of the adapter type or null if the instance to be adapted is null.</returns>
+        public static object CreateAdapter(this object instance, Type adapterType, IServiceProvider serviceProvider)
+        {
+            if (instance == null)
+            {
+                return null;
+            }
+
+            var adapterTypeGenerator = serviceProvider?.GetService<IAdapterTypeGenerator>();
+            if (adapterTypeGenerator == null)
+            {
+                adapterTypeGenerator = new AdapterTypeGenerator();
+            }
+
+            return adapterTypeGenerator.CreateAdapter(instance, adapterType, serviceProvider);
+        }
+
+        /// <summary>
         /// Creates a adapter type.
         /// </summary>
         /// <typeparam name="T">The adapter type.</typeparam>

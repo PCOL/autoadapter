@@ -26,6 +26,7 @@ namespace AutoAdapter.Reflection
 {
     using System;
     using System.Collections.Generic;
+    using System.Linq;
     using System.Reflection;
     using System.Reflection.Emit;
 
@@ -37,9 +38,19 @@ namespace AutoAdapter.Reflection
     internal static class EmitExtensionMethods
     {
         /// <summary>
+        /// A <see cref="ConstructorInfo"/> for the <c>object</c> default constructor.
+        /// </summary>
+        /// <returns></returns>
+        private readonly static ConstructorInfo Object_Ctor = typeof(object).GetConstructor(Type.EmptyTypes);
+
+        /// <summary>
         /// A <see cref="MethodInfo"/> for the <c>Type.GetTypeFromHandle()</c> method.
         /// </summary>
         private readonly static MethodInfo Type_GetTypeFromHandle = typeof(Type).GetMethod("GetTypeFromHandle");
+
+        private readonly static MethodInfo MethodBase_GetMethodFromHandle = typeof(MethodBase).GetMethod("GetMethodFromHandle", new[] { typeof(RuntimeMethodHandle) });
+
+        private readonly static MethodInfo MethodBase_GetMethodFromHandleGeneric = typeof(MethodBase).GetMethod("GetMethodFromHandle", new[] { typeof(RuntimeMethodHandle), typeof(RuntimeTypeHandle) });
 
         /// <summary>
         /// A <see cref="MethodInfo"/> for the <c>Object.GetType()</c> method.
@@ -83,6 +94,19 @@ namespace AutoAdapter.Reflection
         }
 
         /// <summary>
+        /// Emits IL to call the object base constructor.
+        /// </summary>
+        /// <param name="ilGen">A <see cref="ILGenerator"/> instance.</param>
+        /// <returns>The <see cref="ILGenerator"/> instance.</returns>
+        public static ILGenerator EmitCallBaseCtor(this ILGenerator ilGen)
+        {
+            ilGen.Emit(OpCodes.Ldarg_0);
+            ilGen.Emit(OpCodes.Call, Object_Ctor);
+            ilGen.Emit(OpCodes.Nop);
+            return ilGen;
+        }
+
+        /// <summary>
         /// Perform a 'typeof()' style operation.
         /// </summary>
         /// <typeparam name="T">The <see cref="Type"/> to emit the 'typeof()' for.</typeparam>
@@ -103,6 +127,33 @@ namespace AutoAdapter.Reflection
         {
             ilGen.Emit(OpCodes.Ldtoken, type);
             ilGen.Emit(OpCodes.Call, Type_GetTypeFromHandle);
+            return ilGen;
+        }
+
+        /// <summary>
+        /// Emit IL to get method.
+        /// </summary>
+        /// <typeparam name="T">The <see cref="Type"/> to emit the 'typeof()' for.</typeparam>
+        /// <param name="ilGen">A <see cref="ILGenerator"/> instance.</param>
+        /// <returns>The <see cref="ILGenerator"/> instance.</returns>
+        public static ILGenerator EmitMethod(this ILGenerator ilGen, MethodInfo methodInfo)
+        {
+            ilGen.Emit(OpCodes.Ldtoken, methodInfo);
+            ilGen.Emit(OpCodes.Call, MethodBase_GetMethodFromHandle);
+            return ilGen;
+        }
+
+        /// <summary>
+        /// Emit IL to get method.
+        /// </summary>
+        /// <typeparam name="T">The <see cref="Type"/> to emit the 'typeof()' for.</typeparam>
+        /// <param name="ilGen">A <see cref="ILGenerator"/> instance.</param>
+        /// <returns>The <see cref="ILGenerator"/> instance.</returns>
+        public static ILGenerator EmitMethod(this ILGenerator ilGen, MethodInfo methodInfo, Type declaringType)
+        {
+            ilGen.Emit(OpCodes.Ldtoken, methodInfo);
+            ilGen.Emit(OpCodes.Ldtoken, declaringType);
+            ilGen.Emit(OpCodes.Call, MethodBase_GetMethodFromHandleGeneric);
             return ilGen;
         }
 
@@ -353,27 +404,45 @@ namespace AutoAdapter.Reflection
         /// Emits the IL for a methods parameters.
         /// </summary>
         /// <param name="ilGen">The methods <see cref="ILGenerator"/>.</param>
-        /// <param name="adpaterContext">The current adapter factory context.</param>
         /// <param name="builderContext">The <see cref="BuilderContext"/> of the method being implemented.</param>
-        /// <param name="parameters">The parameters of the method being implemented.</param>
-        /// <param name="proxiedParameters">The parameters of the proxied method.</param>
-        /// <param name="context">The current adapter factory context.</param>
-        /// <param name="staticMethod">A value indicating whether or not the method is static.</param>
         internal static ILGenerator EmitParameters(
             this ILGenerator ilGen,
-            AdapterContext context,
             BuilderContext builderContext)
         {
-            int argStart = builderContext.IsStatic == false || builderContext.IsExtension == true ? 1 : 0;
-            int proxiedstart = builderContext.IsExtension == true ? 1 : 0;
+            Dictionary<int, LocalBuilder> outParameters = null;
+
+            ilGen
+                .EmitParameters(
+                    builderContext.AdapterContext,
+                    builderContext.Parameters,
+                    builderContext.ProxiedParameters,
+                    builderContext.IsStatic,
+                    builderContext.IsExtension,
+                    ref outParameters);
+
+            builderContext.OutParameters = outParameters;
+            return ilGen;
+        }
+
+        internal static ILGenerator EmitParameters(
+            this ILGenerator ilGen,
+            AdapterContext adapterContext,
+            ParameterInfo[] parameters,
+            ParameterInfo[] proxiedParameters,
+            bool isStatic,
+            bool isExtension,
+            ref Dictionary<int, LocalBuilder> outParameters)
+        {
+            int argStart = isStatic == false || isExtension == true ? 1 : 0;
+            int proxiedstart = isExtension == true ? 1 : 0;
 
             for (int i = 0, argIndex = argStart, proxiedIndex = proxiedstart;
-                i < builderContext.Parameters.Length;
+                i < parameters.Length;
                 i++, argIndex++, proxiedIndex++)
             {
-                var parm = builderContext.Parameters[i];
+                var parm = parameters[i];
                 var parmType = parm.ParameterType;
-                var proxiedParm = builderContext.ProxiedParameters[proxiedIndex];
+                var proxiedParm = proxiedParameters[proxiedIndex];
                 var proxiedParmType = proxiedParm.ParameterType;
 
                 // Does the parameter have and an adapter extension applied?
@@ -395,7 +464,7 @@ namespace AutoAdapter.Reflection
                                 extensionMethodName,
                                 parmType,
                                 parmType,
-                                context,
+                                adapterContext,
                                 parmValue,
                                 parmValue);
                     }
@@ -404,7 +473,7 @@ namespace AutoAdapter.Reflection
                     if (parmType != proxiedParmType)
                     {
                         ilGen.EmitAdaptedResult(
-                            builderContext,
+                            adapterContext,
                             parmValue,
                             parmType);
                     }
@@ -424,7 +493,7 @@ namespace AutoAdapter.Reflection
                                 extensionMethodName,
                                 parmType,
                                 parmType,
-                                context,
+                                adapterContext,
                                 parmValue,
                                 parmValue);
 
@@ -442,7 +511,9 @@ namespace AutoAdapter.Reflection
                         Type proxiedType = proxiedParmType.GetElementType();
                         LocalBuilder parmValue = ilGen.DeclareLocal(proxiedType);
                         ilGen.Emit(OpCodes.Ldloca, parmValue);
-                        builderContext.AddOutParameter(argIndex, parmValue);
+
+                        outParameters = outParameters ?? new Dictionary<int, LocalBuilder>();
+                        outParameters[argIndex] = parmValue;
                     }
                     else if (parm.IsOut == true &&
                         parmType.GetElementType().IsArray == true &&
@@ -451,7 +522,43 @@ namespace AutoAdapter.Reflection
                         Type proxiedType = proxiedParmType.GetElementType();
                         LocalBuilder parmValue = ilGen.DeclareLocal(proxiedType);
                         ilGen.Emit(OpCodes.Ldloca, parmValue);
-                        builderContext.AddOutParameter(argIndex, parmValue);
+
+                        outParameters = outParameters ?? new Dictionary<int, LocalBuilder>();
+                        outParameters[argIndex] = parmValue;
+                    }
+                    else if (typeof(Delegate).IsAssignableFrom(parmType))
+                    {
+                        if (parmType.FullName.StartsWith("System.Action"))
+                        {
+                            var actionType = new ActionAdapterGenerator()
+                                .GenerateType(
+                                    parmType.GetGenericArguments(),
+                                    proxiedParmType.GetGenericArguments());
+
+                            var actionCtor = actionType.GetConstructor(new[] { parmType });
+
+                            ilGen.Emit(OpCodes.Ldarg, argIndex);
+                            ilGen.Emit(OpCodes.Newobj, actionCtor);
+                            ilGen.Emit(OpCodes.Callvirt, actionType.GetMethod("Adapted"));
+
+                        }
+                        else if (parmType.FullName.StartsWith("System.Func"))
+                        {
+                            var funcType = new FuncAdapterGenerator()
+                                .GenerateType(
+                                    parmType.GetGenericArguments(),
+                                    proxiedParmType.GetGenericArguments());
+
+                            var funcCtor = funcType.GetConstructor(new[] { parmType });
+
+                            ilGen.Emit(OpCodes.Ldarg, argIndex);
+                            ilGen.Emit(OpCodes.Newobj, funcCtor);
+                            ilGen.Emit(OpCodes.Callvirt, funcType.GetMethod("Adapted"));
+                        }
+                        else
+                        {
+                            ilGen.Emit(OpCodes.Ldnull);
+                        }
                     }
                     else
                     {
@@ -460,7 +567,7 @@ namespace AutoAdapter.Reflection
                         ilGen.Emit(OpCodes.Stloc, parmValue);
 
                         ilGen.EmitAdaptedResult(
-                            builderContext,
+                            adapterContext,
                             parmValue,
                             parmType);
                     }
@@ -484,12 +591,12 @@ namespace AutoAdapter.Reflection
         /// <returns></returns>
         public static ILGenerator EmitAdaptedResult(
             this ILGenerator ilGen,
-            BuilderContext builderContext,
+            AdapterContext adapterContext,
             LocalBuilder sourceLocal,
             LocalBuilder resultLocal)
         {
             ilGen
-                .EmitAdaptedResult(builderContext, sourceLocal, resultLocal.LocalType)
+                .EmitAdaptedResult(adapterContext, sourceLocal, resultLocal.LocalType)
                 .Emit(OpCodes.Stloc, resultLocal);
 
             return ilGen;
@@ -505,9 +612,10 @@ namespace AutoAdapter.Reflection
         /// <returns></returns>
         public static ILGenerator EmitAdaptedResult(
             this ILGenerator ilGen,
-            BuilderContext builderContext,
+            AdapterContext adapterContext,
             LocalBuilder sourceLocal,
-            Type returnType)
+            Type returnType,
+            Type targetType = null)
         {
             Type proxiedReturnType = sourceLocal.LocalType;
 
@@ -566,7 +674,10 @@ namespace AutoAdapter.Reflection
                         ilGen.Emit(OpCodes.Ldloc, sourceLocal);
                         ilGen.Emit(OpCodes.Ldloc_S, index);
                         ilGen.Emit(OpCodes.Ldelem_Ref);
-                        builderContext.EmitAdaptedValue(ilGen, proxiedElementType, returnElementType);
+                        ilGen.EmitAdaptedValue(
+                            adapterContext,
+                            proxiedElementType,
+                            returnElementType);
 
                         ilGen.Emit(OpCodes.Stelem_Ref);
                     });
@@ -583,7 +694,7 @@ namespace AutoAdapter.Reflection
                 }
 
                 // If there is a target type set then use that instead of the proxied type.
-                Type targetType = builderContext.TargetType ?? proxiedReturnType;
+                targetType = targetType ?? proxiedReturnType;
 
                 Label notNull = ilGen.DefineLabel();
                 Label done = ilGen.DefineLabel();
@@ -597,7 +708,11 @@ namespace AutoAdapter.Reflection
                 // Push the arguments onto the evaluation stack.
                 ilGen.MarkLabel(notNull);
                 ilGen.Emit(OpCodes.Ldloc_S, sourceLocal);
-                builderContext.EmitAdaptedValue(ilGen, targetType, returnType);
+                ilGen.EmitAdaptedValue(
+                    adapterContext,
+                    targetType,
+                    returnType);
+
                 ilGen.MarkLabel(done);
             }
             else
@@ -1013,6 +1128,144 @@ namespace AutoAdapter.Reflection
 
                     action(index, itemLocal);
                 });
+        }
+
+        /// <summary>
+        /// Emits IL to return out parameters.
+        /// </summary>
+        /// <param name="ilGen">The <see cref="ILGenerator"/> to use.</param>
+        public static void EmitOutParameters(
+            this ILGenerator ilGen,
+            AdapterContext adapterContext,
+            Dictionary<int, LocalBuilder> outParameters,
+            Type[] parameterTypes)
+        {
+            if (outParameters == null ||
+                outParameters.Any() == false)
+            {
+                return;
+            }
+
+            foreach (var outParm in outParameters)
+            {
+                Type fromType = outParm.Value.LocalType;
+                Type toType = parameterTypes[outParm.Key - 1].GetElementType();
+
+                if (fromType != toType)
+                {
+                    if (toType.IsEnum == true)
+                    {
+                        ilGen.EmitStoreByRefArg(
+                            outParm.Key,
+                            outParm.Value,
+                            () => ilGen.Emit(OpCodes.Conv_I4));
+                    }
+                    else if (toType.IsInterface == true)
+                    {
+                        LocalBuilder localToValue = ilGen.DeclareLocal(toType);
+                        ilGen.EmitAdaptedValue(adapterContext, outParm.Value, localToValue);
+                        ilGen.EmitStoreByRefArg(outParm.Key, localToValue);
+                    }
+                    else if (toType.IsArray == true)
+                    {
+                        Type fromElemType = outParm.Value.LocalType.GetElementType();
+                        Type toElemType = toType.GetElementType();
+
+                        LocalBuilder localToArray = ilGen.DeclareLocal(toType);
+                        LocalBuilder localToArrayLength = ilGen.DeclareLocal(typeof(int));
+
+                        ilGen.Emit(OpCodes.Ldloc, outParm.Value);
+                        ilGen.Emit(OpCodes.Ldlen);
+                        ilGen.Emit(OpCodes.Conv_I4);
+                        ilGen.Emit(OpCodes.Dup);
+                        ilGen.Emit(OpCodes.Stloc_S, localToArrayLength);
+                        ilGen.Emit(OpCodes.Newarr, toElemType);
+                        ilGen.Emit(OpCodes.Stloc, localToArray);
+
+                        ilGen.EmitFor(
+                            localToArrayLength,
+                            (index) =>
+                            {
+                                ilGen.Emit(OpCodes.Ldloc, localToArray);
+                                ilGen.Emit(OpCodes.Ldloc, index);
+
+                                ilGen.Emit(OpCodes.Ldloc, outParm.Value);
+                                ilGen.Emit(OpCodes.Ldloc, index);
+                                ilGen.Emit(OpCodes.Ldelem_Ref);
+                                ilGen.EmitAdaptedValue(
+                                    adapterContext,
+                                    fromElemType,
+                                    toElemType);
+
+                                ilGen.Emit(OpCodes.Stelem_Ref);
+                            });
+
+                        ilGen.EmitStoreByRefArg(outParm.Key, localToArray);
+                    }
+                }
+                else
+                {
+                    ilGen.EmitStoreByRefArg(outParm.Key, outParm.Value);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Emits IL to generate an adapted value.
+        /// </summary>
+        /// <param name="ilGen">The <see cref="ILGenerator"/> to use.</param>
+        /// <param name="adapterContext">The <see cref="AdapterContext"/>.</param>
+        /// <param name="localSourceValue">A <see cref="LocalBuilder"/> containing the source value.</param>
+        /// <param name="localAdaptedValue">A <see cref="LocalBuilder"/> to receive the adapted value.</param>
+        public static void EmitAdaptedValue(
+            this ILGenerator ilGen,
+            AdapterContext adapterContext,
+            LocalBuilder localSourceValue,
+            LocalBuilder localAdaptedValue)
+        {
+            Type sourceType  = localSourceValue.LocalType;
+            Type adaptedType = localAdaptedValue.LocalType;
+
+            ilGen.Emit(OpCodes.Ldloc, localSourceValue);
+            ilGen.EmitAdaptedValue(
+                adapterContext,
+                sourceType,
+                adaptedType);
+            ilGen.Emit(OpCodes.Stloc, localAdaptedValue);
+        }
+
+        /// <summary>
+        /// Emits IL to generate an adapted value.
+        /// </summary>
+        /// <param name="ilGen">The <see cref="ILGenerator"/> to use.</param>
+        /// <param name="adapterContext">The <see cref="AdapterContext"/>.</param>
+        /// <param name="sourceType">A source <see cref="Type"/>.</param>
+        /// <param name="adaptedType">The adapted <see cref="Type"/>.</param>
+        public static void EmitAdaptedValue(
+            this ILGenerator ilGen,
+            AdapterContext adapterContext,
+            Type sourceType,
+            Type adaptedType)
+        {
+            var adapterCtor = adapterContext.GetAdapterConstructor(sourceType, adaptedType);
+            if (adapterCtor == null)
+            {
+                throw new AdapterGenerationException("Unable to create adapter");
+            }
+
+            // Construct an instance of the adapter.
+            if (adapterContext.ServiceProviderField != null)
+            {
+                ilGen.Emit(OpCodes.Ldarg_0);
+                ilGen.Emit(OpCodes.Ldfld, adapterContext.ServiceProviderField);
+            }
+            else
+            {
+                ilGen.Emit(OpCodes.Ldnull);
+            }
+
+            ilGen.Emit(OpCodes.Newobj, adapterCtor);
+            ilGen.Emit(OpCodes.Castclass, adaptedType);
         }
     }
 }

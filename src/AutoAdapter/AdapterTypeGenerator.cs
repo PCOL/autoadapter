@@ -513,8 +513,6 @@ namespace AutoAdapter
 
             methodIL.EmitTypeOf(builderContext.GenericArguments[0]);
             methodIL.Emit(OpCodes.Stloc_S, methodReturnType);
-            methodIL.EmitWriteLine("Return Type:");
-            methodIL.EmitWriteLine(methodReturnType);
 
                 // Get custom attributes
             methodIL.EmitGetCustomAttributes<AdapterAttribute>(methodReturnType, true);
@@ -548,8 +546,6 @@ namespace AutoAdapter
             // Get type.
             methodIL.EmitGetType(adaptedTypeName);
             methodIL.Emit(OpCodes.Stloc_S, adaptedType);
-
-            methodIL.EmitWriteLine(adaptedType);
 
             // Create an array of types.
             methodIL.EmitTypeArray(localTypesParam, adaptedType);
@@ -727,7 +723,6 @@ namespace AutoAdapter
         /// <param name="adapterContext">The adapter factories current context.</param>
         /// <param name="builderContext">The <see cref="MethodInfo"/> of the method being implemented.</param>
         /// <param name="ilGen">The methods <see cref="ILGenerator"/>.</param>
-        /// <param name="methodArgs">An array containing the methods argument types.</param>
         private void BuildMethod(
             AdapterContext adapterContext,
             BuilderContext builderContext,
@@ -810,7 +805,7 @@ namespace AutoAdapter
 
                         ilGen.Emit(OpCodes.Ldarg_0);
                         ilGen.Emit(OpCodes.Ldfld, adapterContext.BaseObjectField);
-                        ilGen.EmitParameters(adapterContext, builderContext);
+                        ilGen.EmitParameters(builderContext);
                         ilGen.Emit(OpCodes.Call, builderContext.ProxiedMethod);
                     }
                     else
@@ -822,7 +817,7 @@ namespace AutoAdapter
                 }
                 else
                 {
-                    ilGen.EmitParameters(adapterContext, builderContext);
+                    ilGen.EmitParameters(builderContext);
                     ilGen.Emit(OpCodes.Call, builderContext.ProxiedMethod);
                 }
             }
@@ -833,7 +828,7 @@ namespace AutoAdapter
                 {
                     ilGen.Emit(OpCodes.Ldarg_0);
                     ilGen.Emit(OpCodes.Ldfld, adapterContext.BaseObjectField);
-                    ilGen.EmitParameters(adapterContext, builderContext);
+                    ilGen.EmitParameters(builderContext);
                     ilGen.Emit(OpCodes.Callvirt, builderContext.ProxiedMethod);
                 }
 
@@ -842,7 +837,7 @@ namespace AutoAdapter
                 {
                     ilGen.Emit(OpCodes.Ldarg_0);
                     ilGen.Emit(OpCodes.Ldflda, adapterContext.BaseObjectField);
-                    ilGen.EmitParameters(adapterContext, builderContext);
+                    ilGen.EmitParameters(builderContext);
                     ilGen.Emit(OpCodes.Call, builderContext.ProxiedMethod);
                 }
             }
@@ -909,7 +904,7 @@ namespace AutoAdapter
             if (returnType != proxiedReturnType)
             {
                 ilGen.EmitAdaptedResult(
-                    builderContext,
+                    builderContext.AdapterContext,
                     proxiedReturnLocal,
                     returnType);
             }
@@ -971,7 +966,7 @@ namespace AutoAdapter
                 else if (field.FieldType != methodInfo.ReturnType)
                 {
                     ilGen.EmitAdaptedResult(
-                        builderContext,
+                        adapterContext,
                         fieldValue,
                         methodInfo.ReturnType);
                 }

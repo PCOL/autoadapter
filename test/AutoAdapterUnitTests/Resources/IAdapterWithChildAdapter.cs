@@ -1,3 +1,4 @@
+using System;
 using AutoAdapter;
 
 namespace AutoAdapterUnitTests.Resources
@@ -10,6 +11,11 @@ namespace AutoAdapterUnitTests.Resources
 
         bool TryGetChild(out IChildAdapter child);
 
+
         bool TryGetChildren(out IChildAdapter[] children);
+
+        void ActionParameter(Action<IChildAdapter> action);
+
+        void FuncParameter(Func<IChildAdapter> func);
     }
 }

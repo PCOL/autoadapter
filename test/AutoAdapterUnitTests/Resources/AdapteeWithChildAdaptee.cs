@@ -1,3 +1,5 @@
+using System;
+
 namespace AutoAdapterUnitTests.Resources
 {
     public class AdapteeWithChildAdaptee
@@ -29,5 +31,16 @@ namespace AutoAdapterUnitTests.Resources
 
             return false;
         }
+
+        public void ActionParameter(Action<ChildAdaptee> action)
+        {
+            action(this.Child);
+        }
+
+        public void FuncParameter(Func<ChildAdaptee> func)
+        {
+            this.Child = func();
+        }
+
     }
 }

@@ -57,5 +57,14 @@ namespace AutoAdapter
         /// <param name="serviceProvider">Optional service provider</param>
         /// <returns>An instance of the adapter if valid; otherwise null.</returns>
         T CreateAdapter<T>(object instance, IServiceProvider serviceProvider = null);
+
+        /// <summary>
+        /// Create instance of an adapter.
+        /// </summary>
+        /// <param name="instance">The instance of the object to adapt.</param>
+        /// <param name="serviceProvider">Optional service provider</param>
+        /// <param name="adapterType">The interface describing the adapter type.</param>
+        /// <returns>An instance of the adapter if valid; otherwise null.</returns>
+        object CreateAdapter(object instance, Type adapterType, IServiceProvider serviceProvider = null);
     }
 }

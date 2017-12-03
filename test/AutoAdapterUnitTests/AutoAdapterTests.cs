@@ -6,7 +6,7 @@ using Xunit;
 
 namespace AutoAdapterUnitTests
 {
-    public class AutoAdapterUnitTests
+    public class AutoAdapterTests
     {
         [Fact]
         public void CreateIPropertyAdapter_FromPropertyAdaptee()
@@ -199,6 +199,54 @@ namespace AutoAdapterUnitTests
             {
                 Assert.Equal(adaptee.Children[i].Property, children[i].Property);
             }
+        }
+
+        [Fact]
+        public void CreateIAdapterWithChildAdapter_FromAdapteeWithChildAdaptee_TestActionParameter()
+        {
+            var adaptee = new AdapteeWithChildAdaptee()
+            {
+                Child = new ChildAdaptee()
+                {
+                    Property = "Test"
+                }
+            };
+
+            var adapter = adaptee.CreateAdapter<IAdapterWithChildAdapter>();
+
+            Assert.NotNull(adapter);
+
+            IChildAdapter calledChild = null;
+            adapter.ActionParameter(
+                (child) =>
+                {
+                    calledChild = child;
+                });
+
+            Assert.NotNull(calledChild);
+            Assert.Equal("Test", calledChild.Property);
+        }
+
+        [Fact]
+        public void CreateIAdapterWithChildAdapter_FromAdapteeWithChildAdaptee_TestFuncParameter()
+        {
+            var adaptee = new AdapteeWithChildAdaptee();
+
+            var adapter = adaptee.CreateAdapter<IAdapterWithChildAdapter>();
+
+            Assert.NotNull(adapter);
+
+            adapter.FuncParameter(
+                () =>
+                {
+                    return new ChildAdaptee()
+                    {
+                        Property = "Test"
+                    }.CreateAdapter<IChildAdapter>();
+                });
+
+            Assert.NotNull(adaptee.Child);
+            Assert.Equal("Test", adaptee.Child.Property);
         }
 
         [Fact]
