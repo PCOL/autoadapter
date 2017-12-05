@@ -131,6 +131,36 @@ namespace AutoAdapter.Reflection
         }
 
         /// <summary>
+        /// Emits the IL to perform an 'IsAssignableFrom' operation.
+        /// </summary>
+        /// <param name="ilGen">A <see cref="ILGenerator"/> instance.</param>
+        /// <param name="from">The <see cref="Type"/> to check is assignable from.</param>
+        /// <param name="local">A <see cref="LocalBuilder"/> to check.</param>
+        /// <returns>The <see cref="ILGenerator"/> instance.</returns>
+        public static ILGenerator EmitIsAssignableFrom<T>(this ILGenerator ilGen, LocalBuilder local)
+        {
+            return ilGen.EmitIsAssignableFrom(typeof(T), local);
+        }
+
+        /// <summary>
+        /// Emits the IL to perform an 'IsAssignableFrom' operation.
+        /// </summary>
+        /// <param name="ilGen">A <see cref="ILGenerator"/> instance.</param>
+        /// <param name="from">The <see cref="Type"/> to check is assignable from.</param>
+        /// <param name="local">A <see cref="LocalBuilder"/> to check.</param>
+        /// <returns>The <see cref="ILGenerator"/> instance.</returns>
+        public static ILGenerator EmitIsAssignableFrom(this ILGenerator ilGen, Type from, LocalBuilder local)
+        {
+            ilGen.EmitTypeOf(from);
+            ilGen.Emit(OpCodes.Ldloca, local);
+            ilGen.Emit(OpCodes.Constrained, local.LocalType);
+            ilGen.Emit(OpCodes.Callvirt, Object_GetType);
+            ilGen.Emit(OpCodes.Callvirt, Type_IsAssignableFrom);
+
+            return ilGen;
+        }
+
+        /// <summary>
         /// Emit IL to get method.
         /// </summary>
         /// <typeparam name="T">The <see cref="Type"/> to emit the 'typeof()' for.</typeparam>
@@ -530,11 +560,11 @@ namespace AutoAdapter.Reflection
                     {
                         if (parmType.FullName.StartsWith("System.Action"))
                         {
-                            var actionType = new ActionAdapterGenerator()
+                            var actionType = new ActionAdapterGenerator(adapterContext)
                                 .GenerateType(
                                     parmType.GetGenericArguments(),
                                     proxiedParmType.GetGenericArguments());
-
+                                    
                             var actionCtor = actionType.GetConstructor(new[] { parmType });
 
                             ilGen.Emit(OpCodes.Ldarg, argIndex);
@@ -544,7 +574,7 @@ namespace AutoAdapter.Reflection
                         }
                         else if (parmType.FullName.StartsWith("System.Func"))
                         {
-                            var funcType = new FuncAdapterGenerator()
+                            var funcType = new FuncAdapterGenerator(adapterContext)
                                 .GenerateType(
                                     parmType.GetGenericArguments(),
                                     proxiedParmType.GetGenericArguments());

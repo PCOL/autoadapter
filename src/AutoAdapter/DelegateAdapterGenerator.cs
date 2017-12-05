@@ -35,15 +35,27 @@ namespace AutoAdapter
     /// </summary>
     internal class DelegateAdapterGenerator
     {
+        private AdapterContext adapterContext;
+
         private string typeName;
 
-        public DelegateAdapterGenerator()
-            : this("DelegateAdapter")
+        /// <summary>
+        /// Initialises a new instance of the <see cref="DelegateAdapterGenerator"/> class.
+        /// </summary>
+        /// <param name="adapterContext">The adapter context.</param>
+        public DelegateAdapterGenerator(AdapterContext adapterContext)
+            : this(adapterContext, "DelegateAdapter")
         {
         }
 
-        protected DelegateAdapterGenerator(string typeName)
+        /// <summary>
+        /// Initialises a new instance of the <see cref="DelegateAdapterGenerator"/> class.
+        /// </summary>
+        /// <param name="adapterContext">The adapter context.</param>
+        /// <param name="typeName">The type name.</param>
+        protected DelegateAdapterGenerator(AdapterContext adapterContext, string typeName)
         {
+            this.adapterContext = adapterContext;
             this.typeName = typeName;
         }
 
@@ -62,6 +74,20 @@ namespace AutoAdapter
         }
 
         /// <summary>
+        /// Copy types to a list of arguments and a return type.
+        /// </summary>
+        /// <param name="fromArray">The source array.</param>
+        /// <param name="toArray">A variable to receive the argument types.</param>
+        /// <returns>The return type</returns>
+        protected Type CopyToArgumentsAndReturnType(Type[] fromArray, out Type[] toArray)
+        {
+            int len = fromArray.Length - 1;
+            toArray = new Type[len];
+            Array.Copy(fromArray, 0, toArray, 0, len);
+            return fromArray[len];
+        }
+
+        /// <summary>
         /// Generates the action adapter type.
         /// </summary>
         /// <param name="sourceTypes">The source actions types</param>
@@ -74,23 +100,31 @@ namespace AutoAdapter
             return this.GenerateType(
                 typeof(Delegate),
                 sourceTypes,
+                typeof(void),
                 typeof(Delegate),
-                adaptedTypes);
+                adaptedTypes,
+                typeof(void));
         }
 
         /// <summary>
         /// Generates the action adapter type.
         /// </summary>
-        /// <param name="sourceTypes">The source actions types</param>
-        /// <param name="adaptedTypes"></param>
-        /// <returns></returns>
+        /// <param name="sourceType">The source delegate type</param>
+        /// <param name="sourceTypeArgs">The source delegate argument types</param>
+        /// <param name="sourceReturnType">The source return type</param>
+        /// <param name="adaptedType">The source delegate type</param>
+        /// <param name="adaptedTypeArgs">The adapted delegates argument types.</param>
+        /// <param name="adaptedReturnType">The adapted return type</param>
+        /// <returns>The generated type.</returns>
         protected Type GenerateType(
             Type sourceType,
-            Type[] sourceTypes,
+            Type[] sourceTypeArgs,
+            Type sourceReturnType,
             Type adaptedType,
-            Type[] adaptedTypes)
+            Type[] adaptedTypeArgs,
+            Type adaptedReturnType)
         {
-            string delegateName = MakeTypeName(sourceTypes, adaptedTypes);
+            string delegateName = MakeTypeName(sourceTypeArgs, adaptedTypeArgs);
 
             Type delegateType = AssemblyCache.GetType(
                 delegateName,
@@ -117,10 +151,14 @@ namespace AutoAdapter
 
             this.EmitConstructor(typeBuilder, actionFieldBuilder);
 
-            var internalMethodBuilder =this.EmitInternalMethod(
+            var internalMethodBuilder = this.EmitInternalMethod(
                 typeBuilder,
                 sourceType,
-                sourceTypes,
+                sourceTypeArgs,
+                sourceReturnType,
+                adaptedType,
+                adaptedTypeArgs,
+                adaptedReturnType,
                 actionFieldBuilder);
 
             this.EmitMethod(
@@ -164,12 +202,20 @@ namespace AutoAdapter
         /// <param name="typeBuilder">The <see cref="TypeBuilder"/> instance.</param>
         /// <param name="sourceType">The source type.</param>
         /// <param name="sourceTypeArgs">The source types arguments.</param>
+        /// <param name="sourceReturnType">The source return type.</param>
+        /// <param name="adapterType">The adapter type.</param>
+        /// <param name="adapterTypeArgs">The adapter types arguments.</param>
+        /// <param name="adapterReturnType">The adapter return type.</param>
         /// <param name="actionField">The <see cref="FieldBuilder"/> that holds the action.</param>
         /// <returns>A <see cref="MethodBuilder"/> that represents the internal action.</returns>
         private MethodBuilder EmitInternalMethod(
             TypeBuilder typeBuilder,
             Type sourceType,
             Type[] sourceTypeArgs,
+            Type sourceReturnType,
+            Type adaptedType,
+            Type[] adaptedTypeArgs,
+            Type adaptedReturnType,
             FieldBuilder actionField)
         {
             var methodBuilder = typeBuilder
@@ -177,7 +223,7 @@ namespace AutoAdapter
                     "SourceInternal",
                     MethodAttributes.Private,
                     CallingConventions.HasThis,
-                    typeof(void),
+                    adaptedReturnType ?? typeof(void),
                     sourceTypeArgs);
 
             var createAdapter = typeof(AdapterExtensionMethods)
@@ -191,19 +237,31 @@ namespace AutoAdapter
 
             var ilGen = methodBuilder.GetILGenerator();
 
+            int length = sourceTypeArgs.Length;
+
+            LocalBuilder returnLocal = null;
+            LocalBuilder adaptedReturnLocal = null;
+            if (sourceReturnType != typeof(void))
+            {
+                returnLocal = ilGen.DeclareLocal(sourceReturnType);
+                adaptedReturnLocal = ilGen.DeclareLocal(adaptedReturnType);
+            }
+
+            LocalBuilder[] parmLocals = new LocalBuilder[length];
+
             ilGen.Emit(OpCodes.Nop);
-
-            LocalBuilder[] parmLocals = new LocalBuilder[sourceTypeArgs.Length];
-
-            for (int i = 0; i < sourceTypeArgs.Length; i++)
+            for (int i = 0; i < length; i++)
             {
                 parmLocals[i] = ilGen.DeclareLocal(sourceTypeArgs[i]);
 
                 ilGen.Emit(OpCodes.Ldarg, i + 1);
-                ilGen.Emit(OpCodes.Box, sourceTypeArgs[i]);
+
+                ilGen.Emit(OpCodes.Box, adaptedTypeArgs[i]);
                 ilGen.EmitTypeOf(sourceTypeArgs[i]);
                 ilGen.Emit(OpCodes.Ldnull);
                 ilGen.Emit(OpCodes.Call, createAdapter);
+                ilGen.Emit(OpCodes.Unbox_Any, sourceTypeArgs[i]);
+
                 ilGen.Emit(OpCodes.Stloc, parmLocals[i]);
             }
 
@@ -215,6 +273,41 @@ namespace AutoAdapter
             }
 
             ilGen.Emit(OpCodes.Callvirt, sourceType.GetMethod("Invoke"));
+
+            if (returnLocal != null)
+            {
+                var adapted = ilGen.DefineLabel();
+                var isAssignable = ilGen.DeclareLocal<bool>();
+
+                ilGen.Emit(OpCodes.Stloc, adaptedReturnLocal);
+
+                // Do the return types match?
+                if (sourceReturnType != adaptedReturnType)
+                {
+                    ilGen.Emit(OpCodes.Nop);
+                    ilGen.Emit(OpCodes.Ldloc, adaptedReturnLocal);
+                    ilGen.Emit(OpCodes.Box, adaptedReturnType);
+
+                    ilGen.EmitIsAssignableFrom<IAdaptedObject>(adaptedReturnLocal);
+                    ilGen.Emit(OpCodes.Stloc, isAssignable);
+
+                    ilGen.Emit(OpCodes.Nop);
+                    ilGen.Emit(OpCodes.Ldloc, isAssignable);
+                    ilGen.Emit(OpCodes.Brtrue, adapted);
+                    ilGen.ThrowException(typeof(AdapterGenerationException));
+
+                    ilGen.MarkLabel(adapted);
+                    ilGen.Emit(OpCodes.Callvirt, typeof(IAdaptedObject).GetProperty("AdaptedObject").GetGetMethod());
+                    ilGen.Emit(OpCodes.Stloc, returnLocal);
+                    ilGen.Emit(OpCodes.Nop);
+                    ilGen.Emit(OpCodes.Ldloc, returnLocal);
+                }
+                else
+                {
+                    ilGen.Emit(OpCodes.Ldloc, adaptedReturnLocal);
+                }
+            }
+
             ilGen.Emit(OpCodes.Nop);
             ilGen.Emit(OpCodes.Ret);
 

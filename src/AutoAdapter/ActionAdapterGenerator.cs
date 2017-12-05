@@ -36,8 +36,8 @@ namespace AutoAdapter
     internal class ActionAdapterGenerator
         : DelegateAdapterGenerator
     {
-        public ActionAdapterGenerator()
-            : base("ActionAdapter")
+        public ActionAdapterGenerator(AdapterContext adapterContext)
+            : base(adapterContext, "ActionAdapter")
         {
         }
 
@@ -62,8 +62,10 @@ namespace AutoAdapter
             return this.GenerateType(
                 actionType,
                 sourceTypes,
+                typeof(void),
                 adaptedType,
-                adaptedTypes);
+                adaptedTypes,
+                typeof(void));
         }
     }
 }

@@ -29,8 +29,8 @@ namespace AutoAdapter
     internal class FuncAdapterGenerator
         : DelegateAdapterGenerator
     {
-        public FuncAdapterGenerator()
-            : base("FuncAdapter")
+        public FuncAdapterGenerator(AdapterContext adapterContext)
+            : base(adapterContext, "FuncAdapter")
         {
         }
 
@@ -46,11 +46,17 @@ namespace AutoAdapter
                 .GetType($"System.Func`{adaptedTypes.Length}")
                 .MakeGenericType(adaptedTypes);
 
+            Type sourceReturnType = this.CopyToArgumentsAndReturnType(sourceTypes, out Type[] sourceTypeArgs);
+
+            Type adaptedReturnType = this.CopyToArgumentsAndReturnType(adaptedTypes, out Type[] adaptedTypeArgs);
+
             return this.GenerateType(
                 actionType,
-                sourceTypes,
+                sourceTypeArgs,
+                sourceReturnType,
                 adaptedType,
-                adaptedTypes);
+                adaptedTypeArgs,
+                adaptedReturnType);
         }
     }
 }
