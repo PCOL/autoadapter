@@ -36,6 +36,10 @@ namespace AutoAdapter
     internal class ActionAdapterGenerator
         : DelegateAdapterGenerator
     {
+        /// <summary>
+        /// Initialises a new instance of the <see cref="ActionAdapterGenerator"/> class.
+        /// </summary>
+        /// <param name="adapterContext">A <see cref="AdapterContext"/> instance.</param>
         public ActionAdapterGenerator(AdapterContext adapterContext)
             : base(adapterContext, "ActionAdapter")
         {
@@ -45,8 +49,8 @@ namespace AutoAdapter
         /// Generates the action adapter type.
         /// </summary>
         /// <param name="sourceTypes">The source actions types</param>
-        /// <param name="adaptedTypes"></param>
-        /// <returns></returns>
+        /// <param name="adaptedTypes">The adapted actions types.</param>
+        /// <returns>The generated type.</returns>
         public override Type GenerateType(
             Type[] sourceTypes,
             Type[] adaptedTypes)
