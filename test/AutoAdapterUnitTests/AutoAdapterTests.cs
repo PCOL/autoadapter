@@ -250,6 +250,56 @@ namespace AutoAdapterUnitTests
         }
 
         [Fact]
+        public void CreateIAdapterWithChildAdapter_FromAdapteeWithChildAdaptee_TestPredicateParameter()
+        {
+            var adaptee = new AdapteeWithChildAdaptee()
+            {
+                Child = new ChildAdaptee()
+                {
+                    Property = "Test"
+                }
+            };
+
+            var adapter = adaptee.CreateAdapter<IAdapterWithChildAdapter>();
+
+            Assert.NotNull(adapter);
+
+            var result = adapter.PredicateParameter(
+                (IChildAdapter child) =>
+                {
+                    return child.Property == "Test";
+                });
+
+            Assert.NotNull(adaptee.Child);
+            Assert.True(result);
+        }
+
+        [Fact]
+        public void CreateIAdapterWithChildAdapter_FromAdapteeWithChildAdaptee_TestDelegateParameter()
+        {
+            var adaptee = new AdapteeWithChildAdaptee()
+            {
+                Child = new ChildAdaptee()
+                {
+                    Property = "Test"
+                }
+            };
+
+            var adapter = adaptee.CreateAdapter<IAdapterWithChildAdapter>();
+
+            Assert.NotNull(adapter);
+
+            var result = adapter.Check(
+                (IChildAdapter child) =>
+                {
+                    return child.Property == "Test";
+                });
+
+            Assert.NotNull(adaptee.Child);
+            Assert.True(result);
+        }
+
+        [Fact]
         public void CreateIArrayAdapter_FromArrayAdaptee()
         {
             var adaptee = new ArrayAdaptee()

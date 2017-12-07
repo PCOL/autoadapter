@@ -3,6 +3,8 @@ using AutoAdapter;
 
 namespace AutoAdapterUnitTests.Resources
 {
+    public delegate bool AdaptedDelegateHandler(IChildAdapter child);
+
     public interface IAdapterWithChildAdapter
     {
         IChildAdapter Child { get; }
@@ -17,5 +19,9 @@ namespace AutoAdapterUnitTests.Resources
         void ActionParameter(Action<IChildAdapter> action);
 
         void FuncParameter(Func<IChildAdapter> func);
+
+        bool PredicateParameter(Predicate<IChildAdapter> predicate);
+
+        bool Check(AdaptedDelegateHandler handler);
     }
 }

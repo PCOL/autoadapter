@@ -2,6 +2,8 @@ using System;
 
 namespace AutoAdapterUnitTests.Resources
 {
+    public delegate bool CheckHandler(ChildAdaptee child);
+
     public class AdapteeWithChildAdaptee
     {
         public ChildAdaptee Child { get; set; }
@@ -42,5 +44,14 @@ namespace AutoAdapterUnitTests.Resources
             this.Child = func();
         }
 
-    }
+        public bool PredicateParameter(Predicate<ChildAdaptee> predicate)
+        {
+            return predicate(this.Child);
+        }
+
+        public bool Check(CheckHandler handler)
+        {
+            return handler(this.Child);
+        }
+   }
 }

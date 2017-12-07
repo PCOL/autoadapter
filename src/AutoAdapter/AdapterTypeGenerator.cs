@@ -1017,6 +1017,7 @@ namespace AutoAdapter
             }
             else
             {
+                Console.WriteLine("{0} - Not implemented", methodInfo.Name);
                 // Unable to implement the desired method.
                 ilGen.ThrowException(typeof(NotImplementedException));
             }

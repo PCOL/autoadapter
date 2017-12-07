@@ -83,20 +83,15 @@ namespace AutoAdapter
             Type adaptedType)
         {
             var sourceInvokeMethod = sourceType.GetMethod("Invoke");
-            var sourceTypeArgs = sourceInvokeMethod.GetParameters().Select(p => p.ParameterType).ToArray();
-            var sourceReturnType = sourceInvokeMethod.ReturnType;
-
             var adaptedInvokeMethod = adaptedType.GetMethod("Invoke");
-            var adaptedTypeArgs = adaptedInvokeMethod.GetParameters().Select(p => p.ParameterType).ToArray();
-            var adaptedReturnType = adaptedInvokeMethod.ReturnType;
 
             return this.GenerateType(
                 sourceType,
-                sourceTypeArgs,
-                sourceReturnType,
+                sourceInvokeMethod.GetParameters().Select(p => p.ParameterType).ToArray(),
+                sourceInvokeMethod.ReturnType,
                 adaptedType,
-                adaptedTypeArgs,
-                adaptedReturnType);
+                adaptedInvokeMethod.GetParameters().Select(p => p.ParameterType).ToArray(),
+                adaptedInvokeMethod.ReturnType);
         }
 
         /// <summary>
