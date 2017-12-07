@@ -31,46 +31,31 @@ namespace AutoAdapter
     using AutoAdapter.Reflection;
 
     /// <summary>
-    /// Action adapter generator.
+    /// Delegate adapter generator.
     /// </summary>
     internal class DelegateAdapterGenerator
     {
         private AdapterContext adapterContext;
 
-        private string typeName;
-
+        /// <summary>
         /// <summary>
         /// Initialises a new instance of the <see cref="DelegateAdapterGenerator"/> class.
         /// </summary>
         /// <param name="adapterContext">The adapter context.</param>
         public DelegateAdapterGenerator(AdapterContext adapterContext)
-            : this(adapterContext, "DelegateAdapter")
-        {
-        }
-
-        /// <summary>
-        /// Initialises a new instance of the <see cref="DelegateAdapterGenerator"/> class.
-        /// </summary>
-        /// <param name="adapterContext">The adapter context.</param>
-        /// <param name="typeName">The type name.</param>
-        protected DelegateAdapterGenerator(AdapterContext adapterContext, string typeName)
         {
             this.adapterContext = adapterContext;
-            this.typeName = typeName;
         }
 
         /// <summary>
-        /// Makes the delegate type name
+        /// Makes the type name
         /// </summary>
-        /// <param name="sourceTypes"></param>
-        /// <param name="adaptedTypes"></param>
+        /// <param name="sourceType"></param>
+        /// <param name="adaptedType"></param>
         /// <returns></returns>
-        protected string MakeTypeName(Type[] sourceTypes, Type[] adaptedTypes)
+        protected string MakeTypeName(Type sourceType, Type adaptedType)
         {
-            return string.Format("{0}_{1}_{2}",
-                this.typeName,
-                string.Join(",", sourceTypes.Select(t => t.Name)),
-                string.Join(",", adaptedTypes.Select(t => t.Name)));
+            return $"{sourceType}_{adaptedType}";
         }
 
         /// <summary>
@@ -88,26 +73,34 @@ namespace AutoAdapter
         }
 
         /// <summary>
-        /// Generates the action adapter type.
+        /// Generates a delegate Type.
         /// </summary>
-        /// <param name="sourceTypes">The source actions types</param>
-        /// <param name="adaptedTypes"></param>
+        /// <param name="sourceType"></param>
+        /// <param name="adaptedType"></param>
         /// <returns></returns>
-        public virtual Type GenerateType(
-            Type[] sourceTypes,
-            Type[] adaptedTypes)
+        public Type GenerateDelegateType(
+            Type sourceType,
+            Type adaptedType)
         {
+            var sourceInvokeMethod = sourceType.GetMethod("Invoke");
+            var sourceTypeArgs = sourceInvokeMethod.GetParameters().Select(p => p.ParameterType).ToArray();
+            var sourceReturnType = sourceInvokeMethod.ReturnType;
+
+            var adaptedInvokeMethod = adaptedType.GetMethod("Invoke");
+            var adaptedTypeArgs = adaptedInvokeMethod.GetParameters().Select(p => p.ParameterType).ToArray();
+            var adaptedReturnType = adaptedInvokeMethod.ReturnType;
+
             return this.GenerateType(
-                typeof(Delegate),
-                sourceTypes,
-                typeof(void),
-                typeof(Delegate),
-                adaptedTypes,
-                typeof(void));
+                sourceType,
+                sourceTypeArgs,
+                sourceReturnType,
+                adaptedType,
+                adaptedTypeArgs,
+                adaptedReturnType);
         }
 
         /// <summary>
-        /// Generates the action adapter type.
+        /// Generates the adapter type.
         /// </summary>
         /// <param name="sourceType">The source delegate type</param>
         /// <param name="sourceTypeArgs">The source delegate argument types</param>
@@ -124,7 +117,7 @@ namespace AutoAdapter
             Type[] adaptedTypeArgs,
             Type adaptedReturnType)
         {
-            string delegateName = MakeTypeName(sourceTypeArgs, adaptedTypeArgs);
+            string delegateName = MakeTypeName(sourceType, adaptedType);
 
             Type delegateType = AssemblyCache.GetType(
                 delegateName,
@@ -143,13 +136,13 @@ namespace AutoAdapter
                     delegateName,
                     TypeAttributes.Class | TypeAttributes.Public | TypeAttributes.Sealed);
 
-            var actionFieldBuilder = typeBuilder
+            var sourceFieldBuilder = typeBuilder
                 .DefineField(
                     "source",
                     sourceType,
                     FieldAttributes.Private);
 
-            this.EmitConstructor(typeBuilder, actionFieldBuilder);
+            this.EmitConstructor(typeBuilder, sourceFieldBuilder);
 
             var internalMethodBuilder = this.EmitInternalMethod(
                 typeBuilder,
@@ -159,7 +152,7 @@ namespace AutoAdapter
                 adaptedType,
                 adaptedTypeArgs,
                 adaptedReturnType,
-                actionFieldBuilder);
+                sourceFieldBuilder);
 
             this.EmitMethod(
                 typeBuilder,
@@ -197,7 +190,7 @@ namespace AutoAdapter
         }
 
         /// <summary>
-        /// Emits the internal action method.
+        /// Emits the internal method.
         /// </summary>
         /// <param name="typeBuilder">The <see cref="TypeBuilder"/> instance.</param>
         /// <param name="sourceType">The source type.</param>
@@ -206,8 +199,8 @@ namespace AutoAdapter
         /// <param name="adapterType">The adapter type.</param>
         /// <param name="adapterTypeArgs">The adapter types arguments.</param>
         /// <param name="adapterReturnType">The adapter return type.</param>
-        /// <param name="actionField">The <see cref="FieldBuilder"/> that holds the action.</param>
-        /// <returns>A <see cref="MethodBuilder"/> that represents the internal action.</returns>
+        /// <param name="sourceField">The <see cref="FieldBuilder"/> that holds the source.</param>
+        /// <returns>A <see cref="MethodBuilder"/> that represents the internal method.</returns>
         private MethodBuilder EmitInternalMethod(
             TypeBuilder typeBuilder,
             Type sourceType,
@@ -216,7 +209,7 @@ namespace AutoAdapter
             Type adaptedType,
             Type[] adaptedTypeArgs,
             Type adaptedReturnType,
-            FieldBuilder actionField)
+            FieldBuilder sourceField)
         {
             var methodBuilder = typeBuilder
                 .DefineMethod(
@@ -266,7 +259,7 @@ namespace AutoAdapter
             }
 
             ilGen.Emit(OpCodes.Ldarg_0);
-            ilGen.Emit(OpCodes.Ldfld, actionField);
+            ilGen.Emit(OpCodes.Ldfld, sourceField);
             for (int i = 0; i < parmLocals.Length; i++)
             {
                 ilGen.Emit(OpCodes.Ldloc, parmLocals[i]);
@@ -315,12 +308,12 @@ namespace AutoAdapter
         }
 
         /// <summary>
-        /// Emit the action method.
+        /// Emit the method.
         /// </summary>
         /// <param name="typeBuilder">The <see cref="TypeBuilder"/> instance.</param>
-        /// <param name="sourceType">The action type.</param>
-        /// <param name="adaptedType">The adapted action type.</param>
-        /// <param name="sourceMethod">The internal action method.</param>
+        /// <param name="sourceType">The source type.</param>
+        /// <param name="adaptedType">The adapted type.</param>
+        /// <param name="sourceMethod">The internal method.</param>
         private void EmitMethod(
             TypeBuilder typeBuilder,
             Type sourceType,

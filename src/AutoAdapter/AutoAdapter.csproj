@@ -54,8 +54,6 @@
     <Content Include="Services.cs" />
     <Content Include="AssemblyInfo.cs" />
     <Content Include="BuilderContext.cs" />
-    <Content Include="ActionAdapterGenerator.cs" />
     <Content Include="DelegateAdapterGenerator.cs" />
-    <Content Include="FuncAdapterGenerator.cs" />
   </ItemGroup>
 </Project>

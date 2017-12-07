@@ -558,37 +558,16 @@ namespace AutoAdapter.Reflection
                     }
                     else if (typeof(Delegate).IsAssignableFrom(parmType))
                     {
-                        if (parmType.FullName.StartsWith("System.Action"))
-                        {
-                            var actionType = new ActionAdapterGenerator(adapterContext)
-                                .GenerateType(
-                                    parmType.GetGenericArguments(),
-                                    proxiedParmType.GetGenericArguments());
-                                    
-                            var actionCtor = actionType.GetConstructor(new[] { parmType });
+                        var delType = new DelegateAdapterGenerator(adapterContext)
+                            .GenerateDelegateType(
+                                parmType,
+                                proxiedParmType);
 
-                            ilGen.Emit(OpCodes.Ldarg, argIndex);
-                            ilGen.Emit(OpCodes.Newobj, actionCtor);
-                            ilGen.Emit(OpCodes.Callvirt, actionType.GetMethod("Adapted"));
+                        var funcCtor = delType.GetConstructor(new[] { parmType });
 
-                        }
-                        else if (parmType.FullName.StartsWith("System.Func"))
-                        {
-                            var funcType = new FuncAdapterGenerator(adapterContext)
-                                .GenerateType(
-                                    parmType.GetGenericArguments(),
-                                    proxiedParmType.GetGenericArguments());
-
-                            var funcCtor = funcType.GetConstructor(new[] { parmType });
-
-                            ilGen.Emit(OpCodes.Ldarg, argIndex);
-                            ilGen.Emit(OpCodes.Newobj, funcCtor);
-                            ilGen.Emit(OpCodes.Callvirt, funcType.GetMethod("Adapted"));
-                        }
-                        else
-                        {
-                            ilGen.Emit(OpCodes.Ldnull);
-                        }
+                        ilGen.Emit(OpCodes.Ldarg, argIndex);
+                        ilGen.Emit(OpCodes.Newobj, funcCtor);
+                        ilGen.Emit(OpCodes.Callvirt, delType.GetMethod("Adapted"));
                     }
                     else
                     {
