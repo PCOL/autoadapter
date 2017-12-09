@@ -340,5 +340,27 @@ namespace AutoAdapterUnitTests
             Assert.NotNull(child);
             Assert.Equal("Test", child.Property);
         }
+
+        [Fact]
+        public void CreateAdapter_Timeout()
+        {
+            for (int i = 0; i < 100000; i++)
+            {
+                var adaptee = new ExtensionMethodAdaptee()
+                {
+                    Child = new ChildAdaptee()
+                    {
+                        Property = "Test" + i
+                    }
+                };
+
+                var adapter = adaptee.CreateAdapter<IExtensionMethodAdapter>();
+
+                Assert.NotNull(adapter);
+                Assert.True(adapter.TryGetChild(out IChildAdapter child));
+                Assert.NotNull(child);
+                Assert.Equal("Test" + i, child.Property);
+            }
+        }
     }
 }

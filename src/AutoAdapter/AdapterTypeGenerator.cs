@@ -446,8 +446,10 @@ namespace AutoAdapter
                     builderContext.MethodReturnType,
                     builderContext.ParameterTypes);
 
-            var genTypeBuilders = methodBuilder.DefineGenericParameters(
-                builderContext.GenericArguments.Select(t => t.Name).ToArray());
+            var genTypeBuilders = methodBuilder
+                .DefineGenericParameters(
+                    builderContext.GenericArguments.Select(t => t.Name)
+                        .ToArray());
 
             for (int i = 0; i < builderContext.GenericArguments.Length; i++)
             {

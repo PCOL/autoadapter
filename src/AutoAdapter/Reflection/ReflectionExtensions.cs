@@ -68,12 +68,14 @@ namespace AutoAdapter.Reflection
         /// <param name="genericArgumentCount">The number of generic arguments expected.</param>
         /// <param name="argumentTypes">An array of argument types.</param>
         /// <returns>A <see cref="MethodInfo"/> if the method is found; otherwise false.</returns>
-        public static MethodInfo GetMethod(this Type type, string name, int genericArgumentCount, params Type[] argumentTypes)
+        public static MethodInfo GetMethod(
+            this Type type,
+            string name,
+            int genericArgumentCount,
+            params Type[] argumentTypes)
         {
-            IEnumerable<MethodInfo> methodInfos = type
-                .GetMethods(BindingFlags.Public | BindingFlags.Instance).Where(m => m.Name == name);
-
-            MethodInfo methodInfo = methodInfos
+            MethodInfo methodInfo = type
+                .GetMethods(BindingFlags.Public | BindingFlags.Instance)
                 .Where(m => m.Name == name)
                 .Select(
                     m => new
@@ -82,52 +84,48 @@ namespace AutoAdapter.Reflection
                         Parms = m.GetParameters(),
                         GenericArgs = m.GetGenericArguments()
                     })
-                .Where(x => x.GenericArgs.Length == genericArgumentCount && ParameterTypesMatch(x.Parms, argumentTypes))
+                .Where(x =>
+                    x.GenericArgs.Length == genericArgumentCount &&
+                    ParameterTypesMatch(x.Parms, argumentTypes))
                 .Select(x => x.Method)
                 .FirstOrDefault();
 
-            if (methodInfo == null)
+            if (methodInfo != null)
             {
-                // Check for extension methods
-                ////var extensionTypes = type.Assembly.GetTypes().Where((t) => t.IsSealed && !t.IsGenericType && !t.IsNested).ToArray();
+                return null;
+            }
 
-                foreach (var a in AssemblyCache.GetAssemblies())
+            foreach (var a in AssemblyCache.GetAssemblies())
+            {
+                var methodInfos = a.GetTypes()
+                    .Where((t) => t.IsSealed && !t.IsGenericType && !t.IsNested)
+                    .SelectMany(
+                        t =>
+                            t.GetMethods(BindingFlags.Public | BindingFlags.Static)
+                            .Where(m => m.Name == name));
+
+                if (!methodInfos.IsNullOrEmpty())
                 {
-                    if (a.IsDynamic == false)
-                    {
-                        methodInfos = a.GetTypes()
-                            .Where((t) => t.IsSealed && !t.IsGenericType && !t.IsNested)
-                            .SelectMany(
-                                (t) =>
-                                {
-                                    return t
-                                        .GetMethods(BindingFlags.Public | BindingFlags.Static)
-                                        .Where(m => m.Name == name);
-                                }).ToList();
-
-                        if (!methodInfos.IsNullOrEmpty())
-                        {
-                            methodInfo = methodInfos.Select(
-                                m => new
-                                {
-                                    Method = m,
-                                    Parms = m.GetParameters(),
-                                    Args = m.GetGenericArguments()
-                                })
-                                .Where(x => x.Method.IsDefined(typeof(ExtensionAttribute), false) && x.Parms[0].ParameterType == type && ParameterTypesMatch(x.Parms, 1, argumentTypes, 1, argumentTypes.Length - 1))
-                                .Select(x => x.Method)
-                                .FirstOrDefault();
-
-                            if (methodInfo != null)
+                    methodInfo = methodInfos
+                        .Select(
+                            m => new
                             {
-                                return methodInfo;
-                            }
-                        }
+                                Method = m,
+                                Parms = m.GetParameters(),
+                                Args = m.GetGenericArguments()
+                            })
+                        .Where(x => x.Method.IsDefined(typeof(ExtensionAttribute), false) && x.Parms[0].ParameterType == type && ParameterTypesMatch(x.Parms, 1, argumentTypes, 1, argumentTypes.Length - 1))
+                        .Select(x => x.Method)
+                        .FirstOrDefault();
+
+                    if (methodInfo != null)
+                    {
+                        return methodInfo;
                     }
                 }
             }
 
-            return methodInfo;
+            return null;
         }
 
         /// <summary>
@@ -137,7 +135,9 @@ namespace AutoAdapter.Reflection
         /// <param name="type">The type to search for the method.</param>
         /// <param name="name">The name of the method.</param>
         /// <returns>A <see cref="MethodInfo"/> if the method is found; otherwise false.</returns>
-        public static MethodInfo GetMethodWithParameters<T>(this Type type, string name)
+        public static MethodInfo GetMethodWithParameters<T>(
+            this Type type,
+            string name)
         {
             return type.GetMethodWithParameters<T>(name, BindingFlags.Public | BindingFlags.Instance);
         }
@@ -150,7 +150,10 @@ namespace AutoAdapter.Reflection
         /// <param name="name">The name of the method.</param>
         /// <param name="bindingFlags">The binding flags to use.</param>
         /// <returns>A <see cref="MethodInfo"/> if the method is found; otherwise false.</returns>
-        public static MethodInfo GetMethodWithParameters<T>(this Type type, string name, BindingFlags bindingFlags)
+        public static MethodInfo GetMethodWithParameters<T>(
+            this Type type,
+            string name,
+            BindingFlags bindingFlags)
         {
             return type.GetMethodWithParameters(name, bindingFlags, typeof(T));
         }
@@ -163,9 +166,13 @@ namespace AutoAdapter.Reflection
         /// <param name="type">The type to search for the method.</param>
         /// <param name="name">The name of the method.</param>
         /// <returns>A <see cref="MethodInfo"/> if the method is found; otherwise false.</returns>
-        public static MethodInfo GetMethodWithParameters<T1, T2>(this Type type, string name)
+        public static MethodInfo GetMethodWithParameters<T1, T2>(
+            this Type type,
+            string name)
         {
-            return type.GetMethodWithParameters<T1, T2>(name, BindingFlags.Public | BindingFlags.Instance);
+            return type.GetMethodWithParameters<T1, T2>(
+                name,
+                BindingFlags.Public | BindingFlags.Instance);
         }
 
         /// <summary>
@@ -177,9 +184,16 @@ namespace AutoAdapter.Reflection
         /// <param name="name">The name of the method.</param>
         /// <param name="bindingFlags">The binding flags to use.</param>
         /// <returns>A <see cref="MethodInfo"/> if the method is found; otherwise false.</returns>
-        public static MethodInfo GetMethodWithParameters<T1, T2>(this Type type, string name, BindingFlags bindingFlags)
+        public static MethodInfo GetMethodWithParameters<T1, T2>(
+            this Type type,
+            string name,
+            BindingFlags bindingFlags)
         {
-            return type.GetMethodWithParameters(name, bindingFlags, typeof(T1), typeof(T2));
+            return type.GetMethodWithParameters(
+                name,
+                bindingFlags,
+                typeof(T1),
+                typeof(T2));
         }
 
         /// <summary>
@@ -189,9 +203,15 @@ namespace AutoAdapter.Reflection
         /// <param name="name">The name of the method.</param>
         /// <param name="parameterTypes">The parameters the method must have.</param>
         /// <returns>A <see cref="MethodInfo"/> if the method is found; otherwise false.</returns>
-        public static MethodInfo GetMethodWithParameters(this Type type, string name, params Type[] parameterTypes)
+        public static MethodInfo GetMethodWithParameters(
+            this Type type,
+            string name,
+            params Type[] parameterTypes)
         {
-            return type.GetMethodWithParameters(name, BindingFlags.Public | BindingFlags.Instance, parameterTypes);
+            return type.GetMethodWithParameters(
+                name,
+                BindingFlags.Public | BindingFlags.Instance,
+                parameterTypes);
         }
 
         /// <summary>
@@ -202,23 +222,26 @@ namespace AutoAdapter.Reflection
         /// <param name="bindingFlags">The binding flags to use.</param>
         /// <param name="parameterTypes">The parameters the method must have.</param>
         /// <returns>A <see cref="MethodInfo"/> if the method is found; otherwise false.</returns>
-        public static MethodInfo GetMethodWithParameters(this Type type, string name, BindingFlags bindingFlags, params Type[] parameterTypes)
+        public static MethodInfo GetMethodWithParameters(
+            this Type type,
+            string name,
+            BindingFlags bindingFlags,
+            params Type[] parameterTypes)
         {
-            List<MethodInfo> mis = type
-                .GetMethods(bindingFlags).Where(m => m.Name == name).ToList();
-
-            MethodInfo mi = mis.Select(
-                m => new
-                {
-                    Method = m,
-                    Parms = m.GetParameters(),
-                    Args = m.GetGenericArguments()
-                })
+            MethodInfo methodInfo = type
+                .GetMethods(bindingFlags).Where(m => m.Name == name)
+                .Select(
+                    m => new
+                    {
+                        Method = m,
+                        Parms = m.GetParameters(),
+                        Args = m.GetGenericArguments()
+                    })
                 .Where(x => ParameterTypesAreSimilar(x.Parms, parameterTypes))
                 .Select(x => x.Method)
                 .FirstOrDefault();
 
-            return mi;
+            return methodInfo;
         }
 
         /// <summary>
@@ -228,9 +251,15 @@ namespace AutoAdapter.Reflection
         /// <param name="name">The name of the method.</param>
         /// <param name="parameters">The parameters the method must have.</param>
         /// <returns>A <see cref="MethodInfo"/> representing the method if one has been found; otherwise null.</returns>
-        public static MethodInfo GetMethodWithParameters(this Type type, string name, params ParameterInfo[] parameters)
+        public static MethodInfo GetMethodWithParameters(
+            this Type type,
+            string name,
+            params ParameterInfo[] parameters)
         {
-            return type.GetMethodWithParameters(name, BindingFlags.Instance | BindingFlags.Public, parameters);
+            return type.GetMethodWithParameters(
+                name,
+                BindingFlags.Instance | BindingFlags.Public,
+                parameters);
         }
 
         /// <summary>
@@ -241,7 +270,11 @@ namespace AutoAdapter.Reflection
         /// <param name="bindingFlags">The binding flags to use.</param>
         /// <param name="parameters">The parameters the method must have.</param>
         /// <returns>A <see cref="MethodInfo"/> representing the method if one has been found; otherwise null.</returns>
-        public static MethodInfo GetMethodWithParameters(this Type type, string name, BindingFlags bindingFlags, params ParameterInfo[] parameters)
+        public static MethodInfo GetMethodWithParameters(
+            this Type type,
+            string name,
+            BindingFlags bindingFlags,
+            params ParameterInfo[] parameters)
         {
             return type.GetMethodWithParametersOrAttribute(name, bindingFlags, parameters);
         }
@@ -255,18 +288,22 @@ namespace AutoAdapter.Reflection
         /// <param name="parameters">The parameters the method must have.</param>
         /// <param name="attributeType">The attribute to check for.</param>
         /// <returns>A <see cref="MethodInfo"/> representing the method if one has been found; otherwise null.</returns>
-        public static MethodInfo GetMethodWithParametersOrAttribute(this Type type, string name, BindingFlags bindingFlags, ParameterInfo[] parameters, Type attributeType = null)
+        public static MethodInfo GetMethodWithParametersOrAttribute(
+            this Type type,
+            string name,
+            BindingFlags bindingFlags,
+            ParameterInfo[] parameters,
+            Type attributeType = null)
         {
-            IEnumerable<MethodInfo> methodInfos = type
-                .GetMethods(bindingFlags).Where(m => m.Name == name);
-
-            MethodInfo methodInfo = methodInfos.Select(
-                m => new
-                {
-                    Method = m,
-                    Parms = m.GetParameters(),
-                    Args = m.GetGenericArguments()
-                })
+            MethodInfo methodInfo = type
+                .GetMethods(bindingFlags).Where(m => m.Name == name)
+                .Select(
+                    m => new
+                    {
+                        Method = m,
+                        Parms = m.GetParameters(),
+                        Args = m.GetGenericArguments()
+                    })
                 .Where(x => ParameterTypesMatchOrAttribute(x.Parms, parameters, attributeType))
                 .Select(x => x.Method)
                 .FirstOrDefault();
@@ -283,31 +320,26 @@ namespace AutoAdapter.Reflection
 
                 foreach (var extensionType in extensionTypes)
                 {
-                    methodInfos = extensionType
-                        .GetMethods(bindingFlags).Where(m => m.Name == name);
-
-                    if (methodInfos.IsNullOrEmpty() == false)
-                    {
-                        methodInfo = methodInfos.Select(
+                    methodInfo = extensionType
+                        .GetMethods(bindingFlags).Where(m => m.Name == name)
+                        .Select(
                             m => new
                             {
                                 Method = m,
                                 Parms = m.GetParameters(),
                                 Args = m.GetGenericArguments()
                             })
-                            .Where(x =>
-                            {
-                                return x.Method.IsDefined(typeof(ExtensionAttribute), false) &&
+                        .Where(
+                            x =>
+                                x.Method.IsDefined(typeof(ExtensionAttribute), false) &&
                                     //x.Parms[0].ParameterType == type &&
-                                    ParameterTypesMatchOrAttribute(x.Parms, 1, parameters, 0, parameters.Length, attributeType, true);
-                            })
-                            .Select(x => x.Method)
-                            .FirstOrDefault();
+                                    ParameterTypesMatchOrAttribute(x.Parms, 1, parameters, 0, parameters.Length, attributeType, true))
+                        .Select(x => x.Method)
+                        .FirstOrDefault();
 
-                        if (methodInfo != null)
-                        {
-                            return methodInfo;
-                        }
+                    if (methodInfo != null)
+                    {
+                        return methodInfo;
                     }
                 }
             }
@@ -324,23 +356,30 @@ namespace AutoAdapter.Reflection
         /// <param name="genericArgs">An array of generic argument types.</param>
         /// <param name="parameters">An array of parameter types.</param>
         /// <returns>A <see cref="MethodInfo"/> if the method is found; otherwise false.</returns>
-        public static MethodInfo GetMethod(this Type type, string name, BindingFlags bindingFlags, Type[] genericArgs, Type[] parameters)
+        public static MethodInfo GetMethod(
+            this Type type,
+            string name,
+            BindingFlags bindingFlags,
+            Type[] genericArgs,
+            Type[] parameters)
         {
-            var mis = type
-                .GetMethods(bindingFlags).Where(m => m.Name == name).ToList();
-
-            MethodInfo mi = mis.Select(
-                m => new
-                {
-                    Method = m,
-                    Parms = m.GetParameters(),
-                    Args = m.GetGenericArguments()
-                })
-                .Where(x => TypeListsMatch(x.Args, genericArgs) && ParameterTypesMatch(x.Parms, parameters))
+            var methodInfo = type
+                .GetMethods(bindingFlags).Where(m => m.Name == name)
+                .Select(
+                    m => new
+                    {
+                        Method = m,
+                        Parms = m.GetParameters(),
+                        Args = m.GetGenericArguments()
+                    })
+                .Where(
+                    x =>
+                        TypeListsMatch(x.Args, genericArgs) &&
+                        ParameterTypesMatch(x.Parms, parameters))
                 .Select(x => x.Method)
                 .FirstOrDefault();
 
-            return mi;
+            return methodInfo;
         }
 
         /// <summary>
@@ -375,7 +414,11 @@ namespace AutoAdapter.Reflection
         /// <param name="bindingFlags">The binding flags.</param>
         /// <param name="attributeType">An attribute that a method parameter can have.</param>
         /// <returns>A <see cref="MethodInfo"/> if found; otherwise null.</returns>
-        public static MethodInfo GetSimilarMethod(this Type type, MethodInfo methodInfo, BindingFlags bindingFlags, Type attributeType = null)
+        public static MethodInfo GetSimilarMethod(
+            this Type type,
+            MethodInfo methodInfo,
+            BindingFlags bindingFlags,
+            Type attributeType = null)
         {
             if (type == null)
             {
@@ -388,8 +431,7 @@ namespace AutoAdapter.Reflection
             MethodInfo returnValue = null;
             var methods = type
                 .GetMethods(bindingFlags)
-                .Where(m => m.Name == methodInfo.Name)
-                .ToList();
+                .Where(m => m.Name == methodInfo.Name);
 
             if (methods.IsNullOrEmpty() == false)
             {
@@ -400,61 +442,58 @@ namespace AutoAdapter.Reflection
             bindingFlags |= BindingFlags.Static;
 
             // Has a method been found?
-            if (returnValue == null)
+            if (returnValue != null)
             {
-                var extensionMethods = type
-                    .Assembly
-                    .GetTypes()
-                    .Where((t) => t.IsSealed && !t.IsGenericType && !t.IsNested)
-                    .SelectMany(
-                        (t) =>
-                        {
-                            return type
-                                .GetMethods(bindingFlags)
-                                .Where(m => m.Name == methodInfo.Name);
-                        })
-                    .ToList();
+                return returnValue;
+            }
 
-                foreach (var extensionMethod in extensionMethods)
+            var extensionMethods = type
+                .Assembly
+                .GetTypes()
+                .Where((t) => t.IsSealed && !t.IsGenericType && !t.IsNested)
+                .SelectMany(t =>
+                    t.GetMethods(bindingFlags)
+                        .Where(m => m.Name == methodInfo.Name));
+
+            foreach (var extensionMethod in extensionMethods)
+            {
+                returnValue = FindExtensionMethod(methods, genArgs, parameters, type, attributeType);
+                if (returnValue != null)
                 {
-                    returnValue = FindExtensionMethod(methods, genArgs, parameters, type, attributeType);
-                    if (methodInfo != null)
-                    {
-                        return methodInfo;
-                    }
+                    return returnValue;
                 }
             }
 
             // Has a method been found?
-            if (returnValue == null)
+            if (returnValue != null)
             {
-                // Search all extension methods
-                var extensionMethods = AssemblyCache.GetAssemblies().SelectMany(
-                    (a) => a.GetTypes()
-                        .Where((t) => t.IsSealed && !t.IsGenericType && !t.IsNested)
-                        .SelectMany(
-                            (t) =>
-                            {
-                                return type
-                                    .GetMethods(bindingFlags)
-                                    .Where(m => m.Name == methodInfo.Name);
-                            }))
-                            .ToList();
+                return returnValue;
+            }
 
-                foreach (var extensionMethod in extensionMethods)
+            // Search all extension methods
+            extensionMethods = AssemblyCache.GetAssemblies()
+                .SelectMany(a => a.GetTypes()
+                    .Where(t => t.IsSealed && !t.IsGenericType && !t.IsNested)
+                    .SelectMany(t => t.GetMethods(bindingFlags)
+                        .Where(m => m.Name == methodInfo.Name)));
+
+            foreach (var extensionMethod in extensionMethods)
+            {
+                returnValue = FindExtensionMethod(methods, genArgs, parameters, type, attributeType);
+                if (returnValue != null)
                 {
-                    returnValue = FindExtensionMethod(methods, genArgs, parameters, type, attributeType);
-                    if (methodInfo != null)
-                    {
-                        return methodInfo;
-                    }
+                    return returnValue;
                 }
             }
 
-            return returnValue;
+            return null;
         }
 
-        private static MethodInfo FindMethod(IEnumerable<MethodInfo> methods, Type[] genArgs, ParameterInfo[] parameters, Type attributeType)
+        private static MethodInfo FindMethod(
+            IEnumerable<MethodInfo> methods,
+            Type[] genericArgs,
+            ParameterInfo[] parameters,
+            Type attributeType)
         {
             return methods.Select(
                 m => new
@@ -463,13 +502,18 @@ namespace AutoAdapter.Reflection
                     Parms = m.GetParameters(),
                     Args = m.GetGenericArguments()
                 })
-                .Where(x => x.Args.Length == genArgs.Length &&
+                .Where(x => x.Args.Length == genericArgs.Length &&
                     ParameterTypesMatchOrAttribute(x.Parms, 0, parameters, 0, parameters.Length, attributeType))
                 .Select(x => x.Method)
                 .FirstOrDefault();
         }
 
-        private static MethodInfo FindExtensionMethod(IEnumerable<MethodInfo> methods, Type[] genArgs, ParameterInfo[] parameters, Type extensionType, Type attributeType)
+        private static MethodInfo FindExtensionMethod(
+            IEnumerable<MethodInfo> methods,
+            Type[] genericArgs,
+            ParameterInfo[] parameters,
+            Type extensionType,
+            Type attributeType)
         {
             return methods.Select(
                 m => new
@@ -480,7 +524,7 @@ namespace AutoAdapter.Reflection
                 })
                 .Where(x => x.Method.IsDefined(typeof(ExtensionAttribute), false) &&
                     extensionType == x.Parms[0].ParameterType &&
-                    x.Args.Length == genArgs.Length &&
+                    x.Args.Length == genericArgs.Length &&
                     ParameterTypesMatchOrAttribute(x.Parms, 1, parameters, 0, parameters.Length, attributeType))
                 .Select(x => x.Method)
                 .FirstOrDefault();
@@ -489,19 +533,21 @@ namespace AutoAdapter.Reflection
         /// <summary>
         /// Checks a parameter list against a type lits to see if the types are similar.
         /// </summary>
-        /// <param name="source">The source parameter list.</param>
-        /// <param name="dest">The destination parameter type list.</param>
+        /// <param name="parameters">The parameter list.</param>
+        /// <param name="types">The parameter type list.</param>
         /// <returns>True if the lists are similar; otherwise false.</returns>
-        private static bool ParameterTypesAreSimilar(ParameterInfo[] source, Type[] dest)
+        private static bool ParameterTypesAreSimilar(
+            ParameterInfo[] parameters,
+            Type[] types)
         {
-            if (source.Length != dest.Length)
+            if (parameters.Length != types.Length)
             {
                 return false;
             }
 
-            for (int i = 0; i < source.Length; i++)
+            for (int i = 0; i < parameters.Length; i++)
             {
-                if (source[i].ParameterType.IsSimilarType(dest[i]) == false)
+                if (parameters[i].ParameterType.IsSimilarType(types[i]) == false)
                 {
                     return false;
                 }
@@ -524,24 +570,22 @@ namespace AutoAdapter.Reflection
         }
 
         private static bool ParameterTypesMatch(
-            ParameterInfo[] source,
-            int sourceIndex,
-            Type[] dest,
-            int destIndex,
+            ParameterInfo[] first,
+            int firstStartIndex,
+            Type[] second,
+            int secondStartIndex,
             int length)
         {
-            if (source.Length - sourceIndex < length ||
-                dest.Length - destIndex < length)
+            if (first.Length - firstStartIndex < length ||
+                second.Length - secondStartIndex < length)
             {
                 return false;
             }
 
             for (int i = 0; i < length; i++)
             {
-                ////if (source[sourceIndex + i].ParameterType.IsGenericParameter == false &&
-                ////    source[sourceIndex + i].ParameterType != dest[destIndex + i])
-                if (source[sourceIndex + i].ParameterType.IsGenericParameter == false &&
-                    source[sourceIndex + i].ParameterType.IsSimilarType(dest[destIndex + i]) == false)
+                if (first[firstStartIndex + i].ParameterType.IsGenericParameter == false &&
+                    first[firstStartIndex + i].ParameterType.IsSimilarType(second[secondStartIndex + i]) == false)
                 {
                     return false;
                 }
@@ -553,43 +597,54 @@ namespace AutoAdapter.Reflection
         /// <summary>
         /// Checks the parameter lists to see if the parameters are similar or if the destination parameter has a specific attribute applied.
         /// </summary>
-        /// <param name="source">The source parameter list.</param>
-        /// <param name="dest">The destination parameter list.</param>
+        /// <param name="first">The first parameter list.</param>
+        /// <param name="second">The second parameter list.</param>
         /// <param name="attribute">The optional attribute to check for.</param>
         /// <returns>True if the lists are similar or they have the attribute applied; otherwise false.</returns>
         private static bool ParameterTypesMatchOrAttribute(
-            ParameterInfo[] source,
-            ParameterInfo[] dest,
+            ParameterInfo[] first,
+            ParameterInfo[] second,
             Type attribute = null)
         {
             return ParameterTypesMatchOrAttribute(
-                source,
+                first,
                 0,
-                dest,
+                second,
                 0,
-                source.Length,
+                first.Length,
                 attribute);
         }
 
+        /// <summary>
+        /// Check if two parameter lists match by type
+        /// </summary>
+        /// <param name="first">The first parameter list</param>
+        /// <param name="firstStartIndex">The first parameter list start index.</param>
+        /// <param name="second">The second parameter list.</param>
+        /// <param name="secondStartIndex">The second parameter list start index.</param>
+        /// <param name="length">The length of the parameter list.</param>
+        /// <param name="attribute"></param>
+        /// <param name="isExtension">The value indicating whether or not the parameter list is for an extension method.</param>
+        /// <returns>True if the match; otherwise false.</returns>
         private static bool ParameterTypesMatchOrAttribute(
-            ParameterInfo[] source,
-            int sourceIndex,
-            ParameterInfo[] dest,
-            int destIndex,
+            ParameterInfo[] first,
+            int firstStartIndex,
+            ParameterInfo[] second,
+            int secondStartIndex,
             int length,
             Type attribute = null,
-            bool extension = false)
+            bool isExtension = false)
         {
-            if (source.Length != (dest.Length + (extension == false ? 0 : 1)))
+            if (first.Length != (second.Length + (isExtension == false ? 0 : 1)))
             {
                return false;
             }
 
             for (int i = 0; i < length; i++)
             {
-                var sourceParm = source[sourceIndex + i];
-                var sourceParmType = source[sourceIndex + i].ParameterType;
-                var destParm = dest[destIndex + i];
+                var sourceParm = first[firstStartIndex + i];
+                var sourceParmType = first[firstStartIndex + i].ParameterType;
+                var destParm = second[secondStartIndex + i];
                 var destParmType = destParm.ParameterType;
 
                 if (sourceParmType != destParmType)
@@ -687,6 +742,13 @@ namespace AutoAdapter.Reflection
             return false;
         }
 
+        /// <summary>
+        /// Gets a method with a given name and generic arguments from a type..
+        /// </summary>
+        /// <param name="type">The type to get the method from.</param>
+        /// <param name="name">The name of the method.</param>
+        /// <param name="genericTypes">A list of generic types.</param>
+        /// <returns>A <see cref="MethodInfo"/> if found; otherwise null.</returns>
         private static MethodInfo GetMethod(this Type type, string name, params Type[] genericTypes)
         {
             MethodInfo mi = type
@@ -706,16 +768,22 @@ namespace AutoAdapter.Reflection
             return mi;
         }
 
-        private static bool TypeNamesMatch(Type[] source, Type[] dest)
+        /// <summary>
+        /// Checks if two type lists match by name.
+        /// </summary>
+        /// <param name="first">The first type list.</param>
+        /// <param name="second">The second type list.</param>
+        /// <returns>True if they match; otherwise false.</returns>
+        private static bool TypeNamesMatch(Type[] first, Type[] second)
         {
-            if (source.Length != dest.Length)
+            if (first.Length != second.Length)
             {
                 return false;
             }
 
-            for (int i = 0; i < source.Length; i++)
+            for (int i = 0; i < first.Length; i++)
             {
-                if (source[i].Name != dest[i].Name)
+                if (first[i].Name != second[i].Name)
                 {
                     return false;
                 }
@@ -724,16 +792,23 @@ namespace AutoAdapter.Reflection
             return true;
         }
 
-        private static bool TypeListsMatch(Type[] source, Type[] dest)
+        /// <summary>
+        /// Checks if two type lists match.
+        /// </summary>
+        /// <param name="first">The first type list.</param>
+        /// <param name="second">The second type list.</param>
+        /// <returns>True if they match; otherwise false.</returns>
+        private static bool TypeListsMatch(Type[] first, Type[] second)
         {
-            if (source.Length != dest.Length)
+            if (first.Length != second.Length)
             {
                 return false;
             }
 
-            for (int i = 0; i < source.Length; i++)
+
+            for (int i = 0; i < first.Length; i++)
             {
-                if (source[i] != dest[i])
+                if (first[i] != second[i])
                 {
                     return false;
                 }

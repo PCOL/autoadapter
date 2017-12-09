@@ -64,7 +64,7 @@ namespace AutoAdapter.Reflection
         /// Gets a list of loaded assemblies.
         /// </summary>
         /// <returns>A list of assemblies.</returns>
-        public static IEnumerable<Assembly> GetAssemblies()
+        public static IEnumerable<Assembly> GetAssemblies(bool dynamicOnly = false)
         {
             var runtimeId = RuntimeEnvironment.GetRuntimeIdentifier();
             var compiled =
@@ -72,10 +72,12 @@ namespace AutoAdapter.Reflection
                 let ass = Assembly.Load(lib)
                 select ass;
 
-            return FilterAssemblies(compiled);
+            return FilterAssemblies(compiled, dynamicOnly);
         }
 
-        private static IEnumerable<Assembly> FilterAssemblies(IEnumerable<Assembly> list)
+        private static IEnumerable<Assembly> FilterAssemblies(
+            IEnumerable<Assembly> list,
+            bool dynamicOnly = false)
         {
             if (list == null)
             {
@@ -84,7 +86,11 @@ namespace AutoAdapter.Reflection
 
             foreach (var assembly in list)
             {
-                yield return assembly;
+                if (dynamicOnly == false ||
+                    assembly.IsDynamic == true)
+                {
+                    yield return assembly;
+                }
             }
         }
     }

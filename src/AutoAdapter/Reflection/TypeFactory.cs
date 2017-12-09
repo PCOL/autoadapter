@@ -121,7 +121,7 @@ namespace AutoAdapter.Reflection
         public Type GetType(string typeName, bool dynamicOnly)
         {
             var list = this.assemblyCache.GetAssemblies()
-                .Union(AssemblyCache.GetAssemblies()).ToArray();
+                .Union(AssemblyCache.GetAssemblies());
 
             foreach (var ass in list)
             {
