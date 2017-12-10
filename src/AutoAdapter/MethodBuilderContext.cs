@@ -36,14 +36,14 @@ namespace AutoAdapter
     /// <summary>
     /// Represents a method builder context
     /// </summary>
-    internal class BuilderContext
+    internal class MethodBuilderContext
     {
         /// <summary>
-        /// Initialises a new instance of the <see cref="BuilderContext"/> class.
+        /// Initialises a new instance of the <see cref="MethodBuilderContext"/> class.
         /// </summary>
         /// <param name="adapterContext">A <see cref="AdapterContext"/> instance></param>
         /// <param name="memberInfo">A <see cref="MemberInfo"/> instance></param>
-        public BuilderContext(AdapterContext adapterContext, MemberInfo memberInfo)
+        public MethodBuilderContext(AdapterContext adapterContext, MemberInfo memberInfo)
         {
             this.AdapterContext = adapterContext;
             this.Member = memberInfo;
@@ -162,7 +162,7 @@ namespace AutoAdapter
         public Dictionary<int, LocalBuilder> OutParameters { get; set; }
 
         /// <summary>
-        /// Adds the target property details to the <see cref="BuilderContext"/>.
+        /// Adds the target property details to the <see cref="MethodBuilderContext"/>.
         /// </summary>
         /// <param name="propertyInfo">A <see cref="PropertyInfo"/> instance.</param>
         private void AddTargetPropertyDetailsToContext(
@@ -207,7 +207,7 @@ namespace AutoAdapter
         }
 
         /// <summary>
-        /// Adds the target methods details to the <see cref="BuilderContext"/>.
+        /// Adds the target methods details to the <see cref="MethodBuilderContext"/>.
         /// </summary>
         /// <param name="methodInfo">A <see cref="MethodInfo"/> instance.</param>
         private void AddTargetMethodDetailsToContext(

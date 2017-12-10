@@ -90,7 +90,7 @@ namespace AutoAdapter.Reflection
         }
 
         /// <summary>
-        /// THe module builder
+        /// Gets the module builder
         /// </summary>
         public ModuleBuilder ModuleBuilder { get;}
 
@@ -121,18 +121,15 @@ namespace AutoAdapter.Reflection
         public Type GetType(string typeName, bool dynamicOnly)
         {
             var list = this.assemblyCache.GetAssemblies()
-                .Union(AssemblyCache.GetAssemblies());
+                .Union(AssemblyCache.GetAssemblies())
+                .Where(a => dynamicOnly == false || a.IsDynamic == true);
 
             foreach (var ass in list)
             {
-                if (dynamicOnly == false ||
-                    ass.IsDynamic == true)
+                Type type = ass.GetType(typeName);
+                if (type != null)
                 {
-                    Type type = ass.GetType(typeName);
-                    if (type != null)
-                    {
-                        return type;
-                    }
+                    return type;
                 }
             }
 

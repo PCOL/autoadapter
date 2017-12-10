@@ -53,7 +53,7 @@
     <Content Include="Extensions\IAdapterFactoryExtension.cs" />
     <Content Include="Services.cs" />
     <Content Include="AssemblyInfo.cs" />
-    <Content Include="BuilderContext.cs" />
     <Content Include="DelegateAdapterGenerator.cs" />
+    <Content Include="MethodBuilderContext.cs" />
   </ItemGroup>
 </Project>

@@ -272,6 +272,7 @@ namespace AutoAdapter
                 // Do the return types match?
                 if (sourceReturnType != adaptedReturnType)
                 {
+                    /*
                     ilGen.Emit(OpCodes.Nop);
                     ilGen.Emit(OpCodes.Ldloc, adaptedReturnLocal);
                     ilGen.Emit(OpCodes.Box, adaptedReturnType);
@@ -286,6 +287,8 @@ namespace AutoAdapter
 
                     ilGen.MarkLabel(adapted);
                     ilGen.Emit(OpCodes.Callvirt, typeof(IAdaptedObject).GetProperty("AdaptedObject").GetGetMethod());
+                    */
+                    ilGen.EmitGetAdaptedObject(adaptedReturnLocal);
                     ilGen.Emit(OpCodes.Stloc, returnLocal);
                     ilGen.Emit(OpCodes.Nop);
                     ilGen.Emit(OpCodes.Ldloc, returnLocal);
