@@ -35,5 +35,8 @@
     <Content Include="Resources\ExtensionMethodAdaptee.cs" />
     <Content Include="Resources\ExtensionMethods.cs" />
     <Content Include="Resources\IExtensionMethodAdapter.cs" />
+    <Content Include="GenericTypeAdapterTests.cs" />
+    <Content Include="Resources\GenericAdaptee.cs" />
+    <Content Include="Resources\IGenericAdapter.cs" />
   </ItemGroup>
 </Project>

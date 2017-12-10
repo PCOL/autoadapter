@@ -272,22 +272,6 @@ namespace AutoAdapter
                 // Do the return types match?
                 if (sourceReturnType != adaptedReturnType)
                 {
-                    /*
-                    ilGen.Emit(OpCodes.Nop);
-                    ilGen.Emit(OpCodes.Ldloc, adaptedReturnLocal);
-                    ilGen.Emit(OpCodes.Box, adaptedReturnType);
-
-                    ilGen.EmitIsAssignableFrom<IAdaptedObject>(adaptedReturnLocal);
-                    ilGen.Emit(OpCodes.Stloc, isAssignable);
-
-                    ilGen.Emit(OpCodes.Nop);
-                    ilGen.Emit(OpCodes.Ldloc, isAssignable);
-                    ilGen.Emit(OpCodes.Brtrue, adapted);
-                    ilGen.ThrowException(typeof(AdapterGenerationException));
-
-                    ilGen.MarkLabel(adapted);
-                    ilGen.Emit(OpCodes.Callvirt, typeof(IAdaptedObject).GetProperty("AdaptedObject").GetGetMethod());
-                    */
                     ilGen.EmitGetAdaptedObject(adaptedReturnLocal);
                     ilGen.Emit(OpCodes.Stloc, returnLocal);
                     ilGen.Emit(OpCodes.Nop);

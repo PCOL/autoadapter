@@ -63,7 +63,7 @@ namespace AutoAdapter
         /// <returns>The type name.</returns>
         private static string MakeTypeName(Type adaptedType, Type adapterType)
         {
-            return $"Dynamic.Adapters.{adaptedType.Name}_{adapterType.Name}";
+            return $"Dynamic.Adapters.{adaptedType}_{adapterType}";
         }
 
         /// <summary>
@@ -133,14 +133,18 @@ namespace AutoAdapter
 
             serviceProvider = serviceProvider ?? this.serviceProvider;
 
-            string typeName = MakeTypeName(adaptedType, adapterType);
-            Type newAdapterType = TypeFactory.Default.GetType(typeName, true);
-            if (newAdapterType == null)
+            Type adapter = TypeFactory
+                .Default
+                .GetType(
+                    MakeTypeName(adaptedType, adapterType),
+                    true);
+
+            if (adapter != null)
             {
-                newAdapterType= this.GenerateAdapterType(adaptedType, adapterType, serviceProvider);
+                return adapter;
             }
 
-            return newAdapterType;
+            return this.GenerateAdapterType(adaptedType, adapterType, serviceProvider);
         }
 
         /// <summary>
@@ -218,7 +222,10 @@ namespace AutoAdapter
                     MethodAttributes.HideBySig,
                     CallingConventions.HasThis,
                     typeof(IAdapterExtension),
-                    new[] { typeof(string) });
+                    new[]
+                    {
+                        typeof(string)
+                    });
 
             var genTypeBuilder = method.DefineGenericParameters("T", "TResult");
 
@@ -368,6 +375,7 @@ namespace AutoAdapter
                     MethodBuilder methodBuilder = null;
                     if (methodInfo.ContainsGenericParameters == true)
                     {
+                        Console.WriteLine("Build Generic Method");
                         methodBuilder = this.BuildGenericMethod(adapterContext, methodContext);
                     }
                     else

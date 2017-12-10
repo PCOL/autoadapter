@@ -344,7 +344,7 @@ namespace AutoAdapterUnitTests
         [Fact]
         public void CreateAdapter_Timeout()
         {
-            for (int i = 0; i < 100000; i++)
+            for (int i = 0; i < 10000; i++)
             {
                 var adaptee = new ExtensionMethodAdaptee()
                 {
