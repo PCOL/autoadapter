@@ -1,0 +1,42 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netcoreapp2.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.3.0-preview-20170628-02" />
+    <PackageReference Include="xunit" Version="2.3.1" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.3.1" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\AutoAdapter\AutoAdapter.csproj" />
+    <Content Include="AutoAdapterTests.cs" />
+    <Content Include="TypeFactoryTests.cs" />
+    <Content Include="DynamicObjectAdapterTests.cs" />
+    <Content Include="Resources\IIndexPropertyAdapter.cs" />
+    <Content Include="Resources\PropertyAdaptee.cs" />
+    <Content Include="Resources\IndexPropertyAdaptee.cs" />
+    <Content Include="Resources\DynamicObjectAdaptee.cs" />
+    <Content Include="Resources\StaticPropertyAdaptee.cs" />
+    <Content Include="Resources\IPropertyAdapter.cs" />
+    <Content Include="Resources\IPropertyAdapter.1.cs" />
+    <Content Include="Resources\IStaticPropertyAdapter.cs" />
+    <Content Include="Resources\ApmAdpatee.cs" />
+    <Content Include="Resources\IApmAdapter.cs" />
+    <Content Include="Resources\ITaskApmAdpater.cs" />
+    <Content Include="ApmAdapterTests.cs" />
+    <Content Include="Resources\IAdapterWithChildAdapter.cs" />
+    <Content Include="Resources\IChildAdapter.cs" />
+    <Content Include="Resources\AdapteeWithChildAdaptee.cs" />
+    <Content Include="Resources\ChildAdaptee.cs" />
+    <Content Include="Resources\ArrayAdaptee.cs" />
+    <Content Include="Resources\IArrayAdapter.cs" />
+    <Content Include="Resources\ExtensionMethodAdaptee.cs" />
+    <Content Include="Resources\ExtensionMethods.cs" />
+    <Content Include="Resources\IExtensionMethodAdapter.cs" />
+    <Content Include="GenericTypeAdapterTests.cs" />
+    <Content Include="Resources\GenericAdaptee.cs" />
+    <Content Include="Resources\IGenericAdapter.cs" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,59 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyTitle>AutoAdapter</AssemblyTitle>
+    <VersionPrefix>0.0.1</VersionPrefix>
+    <Title>Adapter Type Generator</Title>
+    <Description>Package to generate adapter types from interface definitions.</Description>
+    <Authors>pcol</Authors>
+    <Copyright>Copyright 2017</Copyright>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <DebugType>portable</DebugType>
+    <AssemblyName>AutoAdapter</AssemblyName>
+    <PackageId>AutoAdapter</PackageId>
+    <NetStandardImplicitPackageVersion>2.0.0</NetStandardImplicitPackageVersion>
+    <!-- <PackageTargetFallback>$(PackageTargetFallback);dnxcore50</PackageTargetFallback> -->
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="System.Reflection" Version="4.3.0" />
+    <PackageReference Include="System.Reflection.Emit" Version="4.3.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyModel" Version="1.1.1" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="1.1.1" />
+    <PackageReference Include="Microsoft.DotNet.InternalAbstractions" Version="1.0.0" />
+    <Content Include="AdapterAttribute.cs" />
+    <Content Include="AdapterBinding.cs" />
+    <Content Include="AdapterContext.cs" />
+    <Content Include="AdapterExtensionMethods.cs" />
+    <Content Include="AdapterFuncTypeGenerator.cs" />
+    <Content Include="AdapterGenerationException.cs" />
+    <Content Include="AdapterImplAttribute.cs" />
+    <Content Include="AdapterTypeGenerator.cs" />
+    <Content Include="IAdaptedObject.cs" />
+    <Content Include="IAdapterContext.cs" />
+    <Content Include="IAdapterFuncTypeGenerator.cs" />
+    <Content Include="IAdapterTypeGenerator.cs" />
+    <Content Include="IEnumerableExtensions.cs" />
+    <Content Include="StringExtensions.cs" />
+    <Content Include="TargetMemberType.cs" />
+    <Content Include="Reflection\TypeFactory.cs" />
+    <Content Include="Reflection\ReflectionExtensions.cs" />
+    <Content Include="Reflection\PropertyExtensionMethods.cs" />
+    <Content Include="Reflection\ParameterInfoExtensions.cs" />
+    <Content Include="Reflection\EmitExtensionMethods.cs" />
+    <Content Include="Reflection\AssemblyCache.cs" />
+    <Content Include="Reflection\AssemblyBuilderCache.cs" />
+    <Content Include="Reflection\ArrayExtensions.cs" />
+    <Content Include="Reflection\ArrayBuilder.cs" />
+    <Content Include="Extensions\AdapterExtensionAttribute.cs" />
+    <Content Include="Extensions\AdapterExtensionPlacement.cs" />
+    <Content Include="Extensions\APMToTaskAdapterExtension.cs" />
+    <Content Include="Extensions\DynamicObjectAdapterFactoryExtension.cs" />
+    <Content Include="Extensions\IAdapterExtension.cs" />
+    <Content Include="Extensions\IAdapterExtension{T,TResult}.cs" />
+    <Content Include="Extensions\IAdapterFactoryExtension.cs" />
+    <Content Include="Services.cs" />
+    <Content Include="AssemblyInfo.cs" />
+    <Content Include="DelegateAdapterGenerator.cs" />
+    <Content Include="MethodBuilderContext.cs" />
+  </ItemGroup>
+</Project>
