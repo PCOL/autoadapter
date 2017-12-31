@@ -275,9 +275,9 @@ namespace AutoAdapter
             ParameterInfo[] parameters)
         {
             this.ProxiedMethod = baseType.GetMethodWithParameters(
-                    methodName,
-                    bindingFlags,
-                    parameters);
+                methodName,
+                bindingFlags,
+                parameters);
 
             this.IsStatic = (bindingFlags & BindingFlags.Static) != 0;
 
@@ -331,7 +331,20 @@ namespace AutoAdapter
 
                 if (fromType != toType)
                 {
-                    if (toType.IsEnum == true)
+                    if (toType.IsGenericParameter == true)
+                    {
+                        var createAdapterMethod = typeof(AdapterExtensionMethods).GetMethod("CreateAdapter", new[] { typeof(object), typeof(Type), typeof(IServiceProvider) });
+
+                        ilGen.Emit(OpCodes.Ldarg, outParm.Key);
+                        //ilGen.EmitTypeOf(fromType);
+                        ilGen.Emit(OpCodes.Ldloc, outParm.Value);
+                        ilGen.EmitTypeOf(toType);
+                        ilGen.Emit(OpCodes.Ldnull);
+                        ilGen.Emit(OpCodes.Call, createAdapterMethod);
+                        //ilGen.Emit(OpCodes.Castclass, toType);
+                        ilGen.Emit(OpCodes.Stind_Ref);
+                    }
+                    else if (toType.IsEnum == true)
                     {
                         ilGen.EmitStoreByRefArg(
                             outParm.Key,

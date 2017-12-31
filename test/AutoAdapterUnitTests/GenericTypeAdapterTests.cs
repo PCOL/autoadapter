@@ -37,5 +37,29 @@ namespace AutoAdapterUnitTests
             Assert.NotNull(adapter.Property);
             Assert.Equal("Test", adapter.Property.Property);
         }
+
+        [Fact]
+        public void GenericAdapter_CreateAdapter_GetProperty()
+        {
+            var adaptee = new GenericAdaptee<ChildAdaptee>()
+            {
+                Property = new ChildAdaptee()
+                {
+                    Property = "Test"
+                }
+            };
+
+            var adapter = adaptee.CreateAdapter<IGenericAdapter<IChildAdapter>>();
+
+            Assert.NotNull(adapter);
+            Assert.NotNull(adapter.Property);
+
+            IChildAdapter child;
+            var result = adapter.GetProperty<IChildAdapter>(out child);
+
+            Assert.True(result);
+            Assert.NotNull(child);
+            Assert.Equal("Test", child.Property);
+        }
     }
 }

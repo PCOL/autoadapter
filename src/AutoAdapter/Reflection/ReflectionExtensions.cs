@@ -78,21 +78,25 @@ namespace AutoAdapter.Reflection
                 .GetMethods(BindingFlags.Public | BindingFlags.Instance)
                 .Where(m => m.Name == name)
                 .Select(
-                    m => new
+                    m =>
                     {
-                        Method = m,
-                        Parms = m.GetParameters(),
-                        GenericArgs = m.GetGenericArguments()
+                        return new
+                        {
+                            Method = m,
+                            Parms = m.GetParameters(),
+                            GenericArgs = m.GetGenericArguments()
+                        };
                     })
                 .Where(x =>
                     x.GenericArgs.Length == genericArgumentCount &&
+                    //x.Parms.Length == parameterCount)
                     ParameterTypesMatch(x.Parms, argumentTypes))
                 .Select(x => x.Method)
                 .FirstOrDefault();
 
             if (methodInfo != null)
             {
-                return null;
+                return methodInfo;
             }
 
             foreach (var a in AssemblyCache.GetAssemblies())
@@ -114,7 +118,12 @@ namespace AutoAdapter.Reflection
                                 Parms = m.GetParameters(),
                                 Args = m.GetGenericArguments()
                             })
-                        .Where(x => x.Method.IsDefined(typeof(ExtensionAttribute), false) && x.Parms[0].ParameterType == type && ParameterTypesMatch(x.Parms, 1, argumentTypes, 1, argumentTypes.Length - 1))
+                        .Where(
+                            x =>
+                                x.Method.IsDefined(typeof(ExtensionAttribute), false) &&
+                                x.Parms[0].ParameterType == type &&
+                                //parameterCount == x.Parms.Length - 1)
+                                ParameterTypesMatch(x.Parms, 1, argumentTypes, 1, argumentTypes.Length - 1))
                         .Select(x => x.Method)
                         .FirstOrDefault();
 
@@ -495,7 +504,7 @@ namespace AutoAdapter.Reflection
             ParameterInfo[] parameters,
             Type attributeType)
         {
-            return methods.Select(
+            var list = methods.Select(
                 m => new
                 {
                     Method = m,
@@ -504,8 +513,9 @@ namespace AutoAdapter.Reflection
                 })
                 .Where(x => x.Args.Length == genericArgs.Length &&
                     ParameterTypesMatchOrAttribute(x.Parms, 0, parameters, 0, parameters.Length, attributeType))
-                .Select(x => x.Method)
-                .FirstOrDefault();
+                .Select(x => x.Method);
+
+            return list.FirstOrDefault();
         }
 
         private static MethodInfo FindExtensionMethod(
@@ -712,10 +722,21 @@ namespace AutoAdapter.Reflection
             // If the types are identical, or they're both generic parameters
             // or the special 'T' type, treat as a match
             if (thisType == type ||
-                (thisType.IsGenericParameter == true && type.IsGenericParameter == false) ||
-                (thisType.IsInterface == false && type.IsInterface == true) ||
+                (thisType.IsGenericParameter == true && type.IsGenericParameter == true) ||
+                (thisType.IsInterface == true && type.IsInterface == true) ||
                 (thisType.IsEnum == true && type.IsEnum == true &&
                 Enum.GetUnderlyingType(thisType) == Enum.GetUnderlyingType(type)))
+            {
+                return true;
+            }
+
+            // Are the types adaptable?
+            if (thisType.IsInterface == false && type.IsInterface == true)
+            {
+                return true;
+            }
+
+            if (thisType.IsGenericParameter == true && type.IsGenericParameter == false)
             {
                 return true;
             }

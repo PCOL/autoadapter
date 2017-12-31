@@ -238,5 +238,131 @@ namespace AutoAdapter
 
             return typeBuilder;
         }
+
+        /// <summary>
+        /// Invokes a generic method with adapted types where required.
+        /// </summary>
+        /// <param name="method">The method to execute.</param>
+        /// <param name="adaptedGenericArgs">The adapted generic type arguments</param>
+        /// <param name="typeArguments">The passed in generic type arguments.</param>
+        /// <param name="obj">The object instance to execute the method against.</param>
+        /// <param name="args">The methods arguments.</param>
+        /// <returns>The result of the method invocation.</returns>
+        public static object InvokeAdapted(this MethodInfo method, Type[] adaptedGenericArgs, Type[] typeArguments, object obj, object[] args)
+        {
+            MethodInfo originalMethod = method;
+
+            if (method.ContainsGenericParameters == true)
+            {
+                method = method.GetGenericMethodDefinition();
+            }
+
+            method = method.MakeGenericMethod(typeArguments);
+
+            bool hasOutParameters = false;
+
+            int index = 0;
+            var methodParms = method.GetParameters();
+            foreach (var parm in methodParms)
+            {
+                if (parm.IsOut == true)
+                {
+                    hasOutParameters = true;
+                }
+
+                if (parm.ParameterType.IsInterface == true &&
+                    typeof(IAdaptedObject).IsAssignableFrom(parm.ParameterType) == true)
+                {
+                    args[index] = ((IAdaptedObject)args[index]).AdaptedObject;
+                }
+
+                index++;
+            }
+
+            var result = method.Invoke(obj, args);
+
+            var originalParms = originalMethod.GetParameters();
+
+            if (hasOutParameters == true)
+            {
+                index = 0;
+                foreach (var parm in originalParms)
+                {
+                    if (parm.IsOut == true)
+                    {
+                        var parmType = parm.ParameterType;
+                        if (parmType.IsGenericParameter == true ||
+                            parmType.GetElementType()?.IsGenericParameter == true)
+                        {
+                            parmType = adaptedGenericArgs[index];
+                        }
+
+                        if (parm.ParameterType != parmType)
+                        {
+                            args[index] = args[index].AdaptObject(parmType);
+                        }
+                    }
+
+                    index++;
+                }
+            }
+
+            if (result != null &&
+                result.GetType() != originalMethod.ReturnType)
+            {
+                result = result.AdaptObject(originalMethod.ReturnType);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Adapts an object to a given type.
+        /// </summary>
+        /// <param name="obj">The object instance to adapt.</param>
+        /// <param name="toType">The type to adapt the object to.</param>
+        /// <returns>The adapted object.</returns>
+        private static object AdaptObject(this object obj, Type toType)
+        {
+            if (obj != null)
+            {
+                if (toType.IsEnum == true)
+                {
+                    return Convert.ChangeType(obj, toType);
+                }
+                else if (toType.IsArray == true)
+                {
+                    return ((object[])obj).AdaptObjectArray(toType);
+                }
+                else if (toType.IsInterface == true)
+                {
+                    return obj.CreateAdapter(toType, null);
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Adapts an array of objects.
+        /// </summary>
+        /// <param name="obj">The object array.</param>
+        /// <param name="toType">The array element type to adapt to.</param>
+        /// <returns>An array of adapted objects.</returns>
+        private static object[] AdaptObjectArray(this object[] obj, Type toType)
+        {
+            if (obj == null)
+            {
+                return null;
+            }
+
+            object[] adaptedArray = new object[obj.Length];
+            for (int i = 0; i < obj.Length; i++)
+            {
+                adaptedArray[i] = obj[i].CreateAdapter(toType, null);
+            }
+
+            return adaptedArray;
+        }
     }
 }

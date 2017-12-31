@@ -67,7 +67,7 @@ namespace AutoAdapter
         /// </summary>
         /// <param name="attr">The <see cref="AdpaterAttribute"/> instance.</param>
         /// <returns>The adapted type if found; otherwise null.</returns>
-        internal Type GetAdaptedType()
+        public Type GetAdaptedType()
         {
             Type adaptedType = this.AdaptedType;
             if (adaptedType == null &&

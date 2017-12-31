@@ -63,7 +63,21 @@ namespace AutoAdapter
         /// <returns>The type name.</returns>
         private static string MakeTypeName(Type adaptedType, Type adapterType)
         {
-            return $"Dynamic.Adapters.{adaptedType}_{adapterType}";
+            string adaptedTypeName = adaptedType.Name;
+            if (adaptedType.IsGenericType == true &&
+                adaptedType.IsGenericTypeDefinition == false)
+            {
+                adaptedTypeName += $"({string.Join(",", adaptedType.GetGenericArguments().Select(t => t.FullName))})";
+            }
+
+            string adapterTypeName = adapterType.Name;
+            if (adapterType.IsGenericType == true &&
+                adapterType.IsGenericTypeDefinition == false)
+            {
+                adapterTypeName += $"({string.Join(",", adapterType.GetGenericArguments().Select(t => t.FullName))})";
+            }
+
+            return $"Dynamic.Adapters.{adaptedTypeName}_{adapterTypeName}";
         }
 
         /// <summary>
@@ -104,6 +118,12 @@ namespace AutoAdapter
             }
 
             Type newAdapterType = this.CreateAdapterType(instance.GetType(), adapterType, serviceProvider);
+            var ctor = newAdapterType.GetConstructor(new[] { instance.GetType(), typeof(IServiceProvider) });
+            if (ctor != null)
+            {
+                return ctor.Invoke(new object[] { instance, serviceProvider} );
+            }
+
             return Activator.CreateInstance(newAdapterType, instance, serviceProvider);
         }
 
@@ -133,28 +153,36 @@ namespace AutoAdapter
 
             serviceProvider = serviceProvider ?? this.serviceProvider;
 
+            string typeName = MakeTypeName(adaptedType, adapterType);
+
             Type adapter = TypeFactory
                 .Default
                 .GetType(
-                    MakeTypeName(adaptedType, adapterType),
+                    typeName,
                     true);
 
-            if (adapter != null)
+            if (adapter == null)
             {
-                return adapter;
+                adapter = this.GenerateAdapterType(typeName, adaptedType, adapterType, serviceProvider);
             }
 
-            return this.GenerateAdapterType(adaptedType, adapterType, serviceProvider);
+            if (adapter.ContainsGenericParameters == true)
+            {
+                adapter = adapter.MakeGenericType(adapterType.GenericTypeArguments);
+            }
+
+            return adapter;
         }
 
         /// <summary>
         /// Generates the adapter type.
         /// </summary>
+        /// <param name="typeName">The name of type being generated.</param>
         /// <param name="adaptedType">The type being adapted.</param>
         /// <param name="adapterType">The adapter interface type to implement.</param>
         /// <param name="serviceProvider">The dependency injection scope to use.</param>
         /// <returns>A <see cref="Type"/> representing the new adapter.</returns>
-        private Type GenerateAdapterType(Type adaptedType, Type adapterType, IServiceProvider serviceProvider)
+        private Type GenerateAdapterType(string typeName, Type adaptedType, Type adapterType, IServiceProvider serviceProvider)
         {
             TypeAttributes typeAttributes = TypeAttributes.Class | TypeAttributes.Public;
 
@@ -163,7 +191,7 @@ namespace AutoAdapter
                 .Default
                 .ModuleBuilder
                 .DefineType(
-                    MakeTypeName(adaptedType, adapterType),
+                    typeName,
                     typeAttributes);
 
             FieldBuilder adaptedTypeField =
@@ -364,24 +392,14 @@ namespace AutoAdapter
                 }
             }
 
-            Dictionary<string, MethodBuilder> propertyMethods = new Dictionary<string, MethodBuilder>();
-
+            var propertyMethods = new Dictionary<string, MethodBuilder>();
             foreach (var memberInfo in adapterContext.NewType.GetMembers())
             {
                 var methodContext = new MethodBuilderContext(adapterContext, memberInfo);
                 if (memberInfo.MemberType == MemberTypes.Method)
                 {
                     MethodInfo methodInfo = methodContext.Method;
-                    MethodBuilder methodBuilder = null;
-                    if (methodInfo.ContainsGenericParameters == true)
-                    {
-                        Console.WriteLine("Build Generic Method");
-                        methodBuilder = this.BuildGenericMethod(adapterContext, methodContext);
-                    }
-                    else
-                    {
-                        methodBuilder = this.BuildMethod(adapterContext, methodContext);
-                    }
+                    MethodBuilder methodBuilder = this.BuildMethod(adapterContext, methodContext);
 
                     if (methodInfo.IsProperty() == true)
                     {
@@ -439,244 +457,6 @@ namespace AutoAdapter
         }
 
         /// <summary>
-        /// Builds a generic method.
-        /// </summary>
-        /// <param name="adapterContext">The current <see cref="AdapterContext"/.></param>
-        /// <param name="methodContext">The current <see cref="MethodBuilderContext"/>.</param>
-        private MethodBuilder BuildGenericMethod(
-            AdapterContext adapterContext,
-            MethodBuilderContext methodContext)
-        {
-            MethodBuilder methodBuilder = adapterContext
-                .TypeBuilder
-                .DefineMethod(
-                    methodContext.Method.Name,
-                    MethodAttributes.Public |
-                    MethodAttributes.Virtual,
-                    methodContext.MethodReturnType,
-                    methodContext.ParameterTypes);
-
-            var genTypeBuilders = methodBuilder
-                .DefineGenericParameters(
-                    methodContext.GenericArguments.Select(t => t.Name)
-                        .ToArray());
-
-            for (int i = 0; i < methodContext.GenericArguments.Length; i++)
-            {
-                genTypeBuilders[i].SetGenericParameterAttributes(
-                    methodContext.GenericArguments[i]
-                        .GenericParameterAttributes
-                );
-            }
-
-            ILGenerator methodIL = methodBuilder.GetILGenerator();
-
-            this.BuildGenericMethod(
-                adapterContext,
-                methodContext,
-                methodIL);
-
-            return methodBuilder;
-        }
-
-        /// <summary>
-        /// Builds a generic method.
-        /// </summary>
-        /// <param name="context">The current <see cref="AdapterContext"/.></param>
-        /// <param name="methodContext">The current <see cref="MethodBuilderContext"/>.</param>
-        /// <param name="methodIL">The methods <see cref="ILGenerator"/>.</param>
-        private void BuildGenericMethod(
-            AdapterContext context,
-            MethodBuilderContext methodContext,
-            ILGenerator methodIL)
-        {
-            MethodInfo methodInfo = methodContext.Method;
-            MethodInfo proxiedMethod = context.BaseType.GetSimilarMethod(methodInfo);
-            if (proxiedMethod == null)
-            {
-                // Throw NotImplementedException
-                methodIL.ThrowException<NotImplementedException>("No matching adaptable method.");
-                return;
-            }
-
-            LocalBuilder methodReturn = null;
-            if (methodInfo.ReturnType != typeof(void))
-            {
-                methodIL.DeclareLocal<object>();
-            }
-
-            LocalBuilder methodReturnTypeAttrs = methodIL.DeclareLocal<object>();
-            LocalBuilder adapterAttribute = methodIL.DeclareLocal<AdapterAttribute>();
-            LocalBuilder methodReturnType = methodIL.DeclareLocal<Type>();
-            LocalBuilder adaptedTypeName = methodIL.DeclareLocal<string>();
-            LocalBuilder adaptedType = methodIL.DeclareLocal<Type>();
-            LocalBuilder localTypesParam = methodIL.DeclareLocal<Type[]>();
-            LocalBuilder localProxiedMethod = methodIL.DeclareLocal<MethodInfo>();
-            LocalBuilder objectArray = methodIL.DeclareLocal<object[]>();
-            LocalBuilder localIsGeneric = methodIL.DeclareLocal<bool>();
-
-            Label labelEnd = methodIL.DefineLabel();
-            Label labelAttributeFound = methodIL.DefineLabel();
-            Label labelAttributeNotFound = methodIL.DefineLabel();
-
-            MethodInfo getMethodImpl = typeof(ReflectionExtensions).GetMethodWithParameters("GetMethod", BindingFlags.Static | BindingFlags.Public, new Type[] { typeof(Type), typeof(int) });
-            MethodInfo makeGenericMethodImpl = typeof(MethodInfo).GetMethod("MakeGenericMethod", new Type[] { typeof(Type[]) });
-            MethodInfo invokeMethod = typeof(MethodInfo).GetMethod("Invoke", new Type[] { typeof(object), typeof(object[]) });
-
-            methodIL.EmitTypeOf(methodContext.GenericArguments[0]);
-            methodIL.Emit(OpCodes.Stloc_S, methodReturnType);
-
-                // Get custom attributes
-            methodIL.EmitGetCustomAttributes<AdapterAttribute>(methodReturnType, true);
-            methodIL.Emit(OpCodes.Stloc_S, methodReturnTypeAttrs);
-
-            methodIL.Emit(OpCodes.Ldloc_S, methodReturnTypeAttrs);
-            methodIL.Emit(OpCodes.Ldlen);
-            methodIL.Emit(OpCodes.Conv_I4);
-            methodIL.Emit(OpCodes.Ldc_I4_0);
-            methodIL.Emit(OpCodes.Bgt_S, labelAttributeFound);
-
-            methodIL.MarkLabel(labelAttributeNotFound);
-            methodIL.ThrowException<AdapterGenerationException>("Unable to determine the adapter type");
-
-            methodIL.MarkLabel(labelAttributeFound);
-
-            methodIL.Emit(OpCodes.Ldloc_S, methodReturnTypeAttrs);
-            methodIL.Emit(OpCodes.Ldc_I4_0);
-            methodIL.Emit(OpCodes.Ldelem, methodReturnTypeAttrs.LocalType);
-            methodIL.Emit(OpCodes.Castclass, typeof(AdapterAttribute));
-            methodIL.Emit(OpCodes.Stloc_S, adapterAttribute);
-
-            methodIL.EmitGetProperty("AdaptedTypeName", adapterAttribute);
-
-            methodIL.Emit(OpCodes.Stloc_S, adaptedTypeName);
-
-            // Null check
-            methodIL.Emit(OpCodes.Ldloc_S, adaptedTypeName);
-            methodIL.Emit(OpCodes.Brfalse_S, labelAttributeNotFound);
-
-            // Get type.
-            methodIL.EmitGetType(adaptedTypeName);
-            methodIL.Emit(OpCodes.Stloc_S, adaptedType);
-
-            // Create an array of types.
-            methodIL.EmitTypeArray(localTypesParam, adaptedType);
-
-            // Gets the proxied method info.
-            methodIL.EmitTypeOf(context.BaseType);
-            methodIL.Emit(OpCodes.Ldc_I4, proxiedMethod.MetadataToken);
-            methodIL.Emit(OpCodes.Call, getMethodImpl);
-            methodIL.Emit(OpCodes.Ldloc_S, localTypesParam);
-            methodIL.Emit(OpCodes.Callvirt, makeGenericMethodImpl);
-            methodIL.Emit(OpCodes.Stloc_S, localProxiedMethod);
-
-            /*
-            methodIL.Emit(OpCodes.Ldarg_0);
-            methodIL.Emit(OpCodes.Ldfld, context.BaseObjectField);
-            methodIL.EmitToString();
-            methodIL.EmitWriteLine();
-
-            methodIL.Emit(OpCodes.Ldarg_1);
-            methodIL.EmitWriteLine();
-
-            methodIL.Emit(OpCodes.Ldarg_2);
-            methodIL.EmitWriteLine();
-
-            methodIL.Emit(OpCodes.Ldarg, 4);
-            methodIL.Emit(OpCodes.Box, methodArgs[3]);
-            methodIL.EmitToString();
-            methodIL.EmitWriteLine();
-
-            methodIL.EmitGetProperty("MetadataToken", localMethod);
-            methodIL.Emit(OpCodes.Box, typeof(int));
-            methodIL.EmitToString();
-            methodIL.EmitWriteLine();
-
-            methodIL.EmitGetProperty("IsGenericMethod", localMethod);
-            methodIL.Emit(OpCodes.Stloc_S, localIsGeneric);
-            methodIL.EmitStringFormat("IsGenericMethod: {0}", localIsGeneric);
-            methodIL.EmitWriteLine();
-            */
-
-            // Build an arguments array.
-            if (methodContext.Parameters.Length > 0)
-            {
-                // Build the arguments array.
-                methodIL
-                    .EmitArray(
-                        typeof(object),
-                        objectArray,
-                        methodContext.Parameters.Length,
-                        (index) =>
-                        {
-                            methodIL.Emit(OpCodes.Ldarg, index);
-                            methodIL.EmitConv(methodContext.Parameters[index].ParameterType, typeof(object), false);
-                        });
-            }
-            else
-            {
-                methodIL.Emit(OpCodes.Ldnull);
-                methodIL.Emit(OpCodes.Stloc_S, objectArray);
-            }
-
-            // Invoke the proxied method.
-            methodIL.Emit(OpCodes.Ldloc_S, localProxiedMethod);
-            methodIL.Emit(OpCodes.Ldarg_0);
-            methodIL.Emit(OpCodes.Ldfld, context.BaseObjectField);
-            methodIL.Emit(OpCodes.Ldloc_S, objectArray);
-            methodIL.Emit(OpCodes.Callvirt, invokeMethod);
-
-            if (methodReturn != null)
-            {
-                methodIL.Emit(OpCodes.Stloc_S, methodReturn);
-            }
-            else
-            {
-                methodIL.Emit(OpCodes.Pop);
-            }
-
-            /*
-            methodIL.Emit(OpCodes.Ldarg_0);
-            methodIL.Emit(OpCodes.Ldfld, context.BaseObjectField);
-            methodIL.Emit(OpCodes.Ldarg_1);
-            methodIL.Emit(OpCodes.Ldarg_2);
-            methodIL.Emit(OpCodes.Ldnull);
-            methodIL.Emit(OpCodes.Ldarg, 4);
-            methodIL.Emit(OpCodes.Conv_I4);
-            methodIL.Emit(OpCodes.Callvirt, localMethod);
-
-            this.EmitParameters(methodIL, methodInfo, proxiedMethod, context);
-            methodIL.Emit(OpCodes.Callvirt, localMethod);
-
-            methodIL.Emit(OpCodes.Ldarg_0);
-            methodIL.Emit(OpCodes.Ldfld, context.BaseObjectField);
-            this.EmitParameters(methodIL, methodInfo, proxiedMethod, context);
-            //MethodInfo callMethod = context.BaseObjectField.FieldType.GetMethod(memberInfo.Name, genericArguments);
-            methodIL.Emit(OpCodes.Callvirt, proxiedMethod);
-            */
-
-            methodIL.MarkLabel(labelEnd);
-
-            if (methodReturn != null)
-            {
-                /*
-                methodIL.Emit(OpCodes.Stloc_S, methodReturn);
-                methodIL.Emit(OpCodes.Ldloc_S, methodReturn);
-                methodIL.Emit(OpCodes.Castclass, methodReturnType);
-                */
-
-                methodIL.Emit(OpCodes.Ldloc_S, methodReturn);
-                //methodIL.Emit(OpCodes.Castclass, methodReturnType);
-            }
-            else
-            {
-            }
-
-            //methodIL.Emit(OpCodes.Ldnull);
-            methodIL.Emit(OpCodes.Ret);
-        }
-
-        /// <summary>
         /// Builds a method
         /// </summary>
         /// <param name="adapterContext">The current <see cref="AdapterContext"/.></param>
@@ -693,6 +473,22 @@ namespace AutoAdapter
                     attrs | MethodAttributes.Virtual,
                     methodContext.MethodReturnType,
                     methodContext.ParameterTypes);
+
+            if (methodContext.Method.IsGenericMethodDefinition == true)
+            {
+                var genTypeBuilders = methodBuilder
+                    .DefineGenericParameters(
+                        methodContext.GenericArguments.Select(t => t.Name)
+                            .ToArray());
+
+                for (int i = 0; i < methodContext.GenericArguments.Length; i++)
+                {
+                    genTypeBuilders[i].SetGenericParameterAttributes(
+                        methodContext.GenericArguments[i]
+                            .GenericParameterAttributes
+                    );
+                }
+            }
 
             for (int i = 0; i < methodContext.Parameters.Length; i++)
             {
@@ -788,15 +584,6 @@ namespace AutoAdapter
                 // Declare locals
                 methodReturnLocal = ilGen.DeclareLocal(methodContext.MethodReturnType);
                 proxiedReturnLocal = ilGen.DeclareLocal(proxiedReturnType);
-
-                // hmm
-                // If this is a generic method changes it to a generic method of return type.
-                // This is NOT robust enough needs to only change the signature if the proxied return
-                // type is actual required in the generic definition.
-                if (methodContext.ProxiedMethod.IsGenericMethodDefinition == true)
-                {
-                    methodContext.MakeGenericProxiedMethod(proxiedReturnType);
-                }
             }
 
             // Is the proxied method static?
@@ -835,12 +622,88 @@ namespace AutoAdapter
             }
             else
             {
+                if (methodContext.Method.IsGenericMethodDefinition == true)
+                {
+                    LocalBuilder genericArgs = ilGen.DeclareLocal<Type[]>();
+                    LocalBuilder adaptedGenericArgs = ilGen.DeclareLocal<Type[]>();
+                    LocalBuilder args = ilGen.DeclareLocal<object[]>();
+                    LocalBuilder length  = ilGen.DeclareLocal<int>();
+
+                    ilGen.EmitArray(
+                        genericArgs,
+                        methodContext.GenericArguments.Length,
+                        (i) =>
+                        {
+                            var attr = ilGen.DeclareLocal<AdapterAttribute>();
+                            ilGen.EmitGetCustomAttribute<AdapterAttribute>(methodContext.GenericArguments[i]);
+                            ilGen.Emit(OpCodes.Stloc, attr);
+                            ilGen.Emit(OpCodes.Ldloc, attr);
+                            ilGen.EmitIfNotNull(
+                                () =>
+                                {
+                                    ilGen.Emit(OpCodes.Ldloc, attr);
+                                    ilGen.Emit(OpCodes.Callvirt, typeof(AdapterAttribute).GetMethod("GetAdaptedType"));
+                                },
+                                () => ilGen.Emit(OpCodes.Ldnull));
+                        });
+
+                    ilGen.EmitArray(
+                        adaptedGenericArgs,
+                        methodContext.GenericArguments.Length,
+                        (i) =>
+                        {
+                            ilGen.EmitTypeOf(methodContext.GenericArguments[i]);
+                        });
+
+                    ilGen.Emit(OpCodes.Ldc_I4, methodContext.ProxiedParameters.Length);
+                    ilGen.Emit(OpCodes.Stloc, length);
+
+                    ilGen.Emit(OpCodes.Ldloc, length);
+                    ilGen.Emit(OpCodes.Newarr, typeof(object));
+                    ilGen.Emit(OpCodes.Stloc, args);
+
+                    // Transfer arguments in to array.
+                    for (int i = 0; i < methodContext.Parameters.Length; i++)
+                    {
+                        if (methodContext.Parameters[i].IsOut == false)
+                        {
+                            ilGen.Emit(OpCodes.Ldloc, args);
+                            ilGen.Emit(OpCodes.Ldc_I4, i);
+                            ilGen.Emit(OpCodes.Ldarg, i + 1);
+                            ilGen.Emit(OpCodes.Stelem_Ref);
+                        }
+                    }
+
+                    // Invoke method
+                    ilGen.EmitMethod(methodContext.ProxiedMethod, methodContext.AdapterContext.BaseType);
+                    ilGen.Emit(OpCodes.Ldloc, adaptedGenericArgs);
+                    ilGen.Emit(OpCodes.Ldloc, genericArgs);
+                    ilGen.Emit(OpCodes.Ldarg_0);
+                    ilGen.Emit(OpCodes.Ldfld, adapterContext.BaseObjectField);
+                    ilGen.Emit(OpCodes.Ldloc, args);
+                    ilGen.Emit(OpCodes.Call, typeof(AdapterExtensionMethods).GetMethod("InvokeAdapted", new[] { typeof(MethodInfo), typeof(Type[]), typeof(Type[]), typeof(object), typeof(object[]) }));
+
+                    // Process out parameters
+                    for (int i = 0; i < methodContext.Parameters.Length; i++)
+                    {
+                        if (methodContext.Parameters[i].IsOut == true)
+                        {
+                            ilGen.Emit(OpCodes.Ldarg, i + 1);
+                            ilGen.Emit(OpCodes.Ldloc, args);
+                            ilGen.Emit(OpCodes.Ldc_I4, i);
+                            ilGen.Emit(OpCodes.Ldelem_Ref);
+                            ilGen.Emit(OpCodes.Stind_Ref);
+                        }
+                    }
+                }
+
                 // Is the adapted type a class?
-                if (adapterContext.BaseType.IsClass == true)
+                else if (adapterContext.BaseType.IsClass == true)
                 {
                     ilGen.Emit(OpCodes.Ldarg_0);
                     ilGen.Emit(OpCodes.Ldfld, adapterContext.BaseObjectField);
                     ilGen.EmitParameters(methodContext);
+
                     ilGen.Emit(OpCodes.Callvirt, methodContext.ProxiedMethod);
                 }
 
@@ -1055,7 +918,6 @@ namespace AutoAdapter
             }
             else
             {
-                Console.WriteLine("{0} - Not implemented", methodInfo.Name);
                 // Unable to implement the desired method.
                 ilGen.ThrowException(typeof(NotImplementedException));
             }

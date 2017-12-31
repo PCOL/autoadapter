@@ -4,6 +4,8 @@ using AutoAdapter.Reflection;
 using AutoAdapterUnitTests.Resources;
 using Xunit;
 
+[assembly: CollectionBehavior(DisableTestParallelization = true)]
+
 namespace AutoAdapterUnitTests
 {
     public class AutoAdapterTests

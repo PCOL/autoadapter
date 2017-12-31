@@ -158,9 +158,21 @@ namespace AutoAdapter.Reflection
         /// <returns>The <see cref="ILGenerator"/>.</returns>
         public static ILGenerator EmitGetProperty(this ILGenerator ilGen, string propertyName, LocalBuilder local)
         {
-            MethodInfo getMethod = local.LocalType.GetMethod($"{GetMethodPrefix}{propertyName}");
-            ilGen.Emit(OpCodes.Ldloc_S, local);
-            ilGen.Emit(OpCodes.Callvirt, getMethod);
+            ilGen.Emit(OpCodes.Ldloc, local);
+            ilGen.EmitGetProperty(propertyName, local.LocalType);
+            return ilGen;
+        }
+
+        /// <summary>
+        /// Emits IL to load the contents of a property onto the evaluation stack.
+        /// </summary>
+        /// <param name="ilGen">The <see cref="ILGenerator"/> to use.</param>
+        /// <param name="propertyName">The property name.</param>
+        /// <param name="propertyType">The property type.</param>
+        /// <returns>The <see cref="ILGenerator"/>.</returns>
+        public static ILGenerator EmitGetProperty(this ILGenerator ilGen, string propertyName, Type propertyType)
+        {
+            ilGen.Emit(OpCodes.Callvirt, propertyType.GetProperty(propertyName).GetGetMethod());
             return ilGen;
         }
 

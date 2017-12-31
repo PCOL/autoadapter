@@ -78,6 +78,16 @@ namespace AutoAdapter.Reflection
         private readonly static MethodInfo String_Format = typeof(string).GetMethod("Format", new Type[] { typeof(string), typeof(object[]) });
 
         /// <summary>
+        /// <see cref="Type"/> Get custom attributes
+        /// </summary>
+        private readonly static MethodInfo Type_GetCustomAttributes = typeof(Type).GetMethod("GetCustomAttributes", new Type[] { typeof(Type), typeof(bool) });
+
+        /// <summary>
+        /// <see cref="CustomAttributeExtensions.GetCustomAttribute(MemberInfo, Type)"/>
+        /// </summary>
+        private readonly static MethodInfo Type_GetCustomAttribute = typeof(CustomAttributeExtensions).GetMethod("GetCustomAttribute", new[] { typeof(MemberInfo), typeof(Type) });
+
+        /// <summary>
         /// A <see cref="PropertyInfo"/> for the <c>IAdaptedObject.AdaptedObject()</c> property.
         /// </summary>
         private readonly static PropertyInfo IAdaptedObject_AdaptedObject = typeof(IAdaptedObject).GetProperty("AdaptedObject");
@@ -157,6 +167,21 @@ namespace AutoAdapter.Reflection
             ilGen.Emit(OpCodes.Callvirt, Object_GetType);
             ilGen.Emit(OpCodes.Callvirt, Type_IsAssignableFrom);
 
+            return ilGen;
+        }
+
+        /// <summary>
+        /// Emits the IL to perform an 'IsAssignableFrom' operation.
+        /// </summary>
+        /// <param name="ilGen">A <see cref="ILGenerator"/> instance.</param>
+        /// <param name="from">The <see cref="Type"/> to check is assignable from.</param>
+        /// <param name="to">A <see cref="Type"/> to check.</param>
+        /// <returns>The <see cref="ILGenerator"/> instance.</returns>
+        public static ILGenerator EmitIsAssignableFrom(this ILGenerator ilGen, Type from, Type to)
+        {
+            ilGen.EmitTypeOf(from);
+            ilGen.EmitTypeOf(to);
+            ilGen.Emit(OpCodes.Callvirt, Type_IsAssignableFrom);
             return ilGen;
         }
 
@@ -517,24 +542,46 @@ namespace AutoAdapter.Reflection
                     // The parameter types do not match so we need to convert the parameter
 
                     // Is this an out/ref parameter?
-                    if (parm.IsOut == true &&
-                        parmType.GetElementType().IsInterface == true)
+                    if (parm.IsOut == true)
                     {
-                        Type proxiedType = proxiedParmType.GetElementType();
-                        LocalBuilder parmValue = ilGen.DeclareLocal(proxiedType);
-                        ilGen.Emit(OpCodes.Ldloca, parmValue);
+                        parmType = parmType.GetElementType();
+                        if (parmType.IsGenericParameter == true)
+                        {
+                            ilGen.EmitWriteLine("======");
+                            ilGen.EmitTypeOf(parmType);
+                            ilGen.EmitTypeOf(typeof(AdapterAttribute));
+                            ilGen.Emit(OpCodes.Call, typeof(CustomAttributeExtensions).GetMethod("GetCustomAttribute", new[] { typeof(MemberInfo), typeof(Type) }));
+                            ilGen.Emit(OpCodes.Callvirt, typeof(AdapterAttribute).GetMethod("GetAdaptedType"));
+                            ilGen.Emit(OpCodes.Callvirt, typeof(object).GetMethod("ToString"));
+                            ilGen.Emit(OpCodes.Call, typeof(Console).GetMethod("WriteLine", new[] { typeof(string) }));
 
-                        methodContext.AddOutParameter(argIndex, parmValue);
-                    }
-                    else if (parm.IsOut == true &&
-                        parmType.GetElementType().IsArray == true &&
-                        parmType.GetElementType().GetElementType().IsInterface == true)
-                    {
-                        Type proxiedType = proxiedParmType.GetElementType();
-                        LocalBuilder parmValue = ilGen.DeclareLocal(proxiedType);
-                        ilGen.Emit(OpCodes.Ldloca, parmValue);
+                            Type proxiedType = proxiedParmType.GetElementType();
+                            LocalBuilder parmValue = ilGen.DeclareLocal<object>(); //proxiedType);
+                            ilGen.Emit(OpCodes.Ldloca, parmValue);
 
-                        methodContext.AddOutParameter(argIndex, parmValue);
+                            methodContext.AddOutParameter(argIndex, parmValue);
+                        }
+                        else if (parmType.IsInterface == true)
+                        {
+                            Type proxiedType = proxiedParmType.GetElementType();
+                            LocalBuilder parmValue = ilGen.DeclareLocal(proxiedType);
+                            ilGen.Emit(OpCodes.Ldloca, parmValue);
+
+                            methodContext.AddOutParameter(argIndex, parmValue);
+                        }
+                        else if (parmType.IsArray == true &&
+                            parmType.GetElementType().IsInterface == true)
+                        {
+                            Type proxiedType = proxiedParmType.GetElementType();
+                            LocalBuilder parmValue = ilGen.DeclareLocal(proxiedType);
+                            ilGen.Emit(OpCodes.Ldloca, parmValue);
+
+                            methodContext.AddOutParameter(argIndex, parmValue);
+                        }
+                        else
+                        {
+                            ilGen.ThrowException<AdapterGenerationException>("Unable to determine adpater type");
+                        }
                     }
                     else if (typeof(Delegate).IsAssignableFrom(parmType))
                     {
@@ -696,10 +743,9 @@ namespace AutoAdapter.Reflection
 
                 // Push the arguments onto the evaluation stack.
                 ilGen.MarkLabel(notNull);
-                ilGen.Emit(OpCodes.Ldloc_S, sourceLocal);
                 ilGen.EmitAdaptedValue(
                     adapterContext,
-                    targetType,
+                    sourceLocal,
                     returnType);
 
                 ilGen.MarkLabel(done);
@@ -715,25 +761,55 @@ namespace AutoAdapter.Reflection
         }
 
         /// <summary>
+        /// Emits the IL to get a custom attribute from a type.
+        /// </summary>
+        /// <typeparam name="T">The type of custom attribute to get.</typeparam>
+        /// <param name="ilGen">The methods <see cref="ILGenerator"/>.</param>
+        /// <param name="type">The type to get the attribute from.</param>
+        /// <returns>The <see cref="ILGenerator"/> instance</returns>
+        public static ILGenerator EmitGetCustomAttribute<T>(
+            this ILGenerator ilGen,
+            Type type)
+        {
+            return ilGen.EmitGetCustomAttribute(type, typeof(T));
+        }
+
+        /// <summary>
+        /// Emits the IL to get a custom attribute from a type.
+        /// </summary>
+        /// <param name="ilGen">The methods <see cref="ILGenerator"/>.</param>
+        /// <param name="type">The type to get the attribute from.</param>
+        /// <param name="attributeType">The type of custom attribute to get.</param>
+        /// <returns>The <see cref="ILGenerator"/> instance</returns>
+        public static ILGenerator EmitGetCustomAttribute(
+            this ILGenerator ilGen,
+            Type type,
+            Type attributeType)
+        {
+            ilGen.EmitTypeOf(type);
+            ilGen.EmitTypeOf(attributeType);
+            ilGen.Emit(OpCodes.Call, typeof(CustomAttributeExtensions).GetMethod("GetCustomAttribute", new[] { typeof(MemberInfo), typeof(Type) }));
+            return ilGen;
+        }
+
+        /// <summary>
         /// Gets the custom attributes for an object instance.
         /// </summary>
         /// <typeparam name="T">The type of custom attribute to get.</typeparam>
         /// <param name="ilGen">The methods <see cref="ILGenerator"/>.</param>
         /// <param name="local">A <see cref="LocalBuilder"/> containg the object instance.</param>
         /// <param name="inherited">A value indicating whether to get inherite attributes.</param>
-        /// <returns></returns>
+        /// <returns>The <see cref="ILGenerator"/> instance</returns>
         public static ILGenerator EmitGetCustomAttributes<T>(
             this ILGenerator ilGen,
             LocalBuilder local,
             bool inherited)
             where T : Attribute
         {
-            MethodInfo getAttributes = typeof(Type).GetMethod("GetCustomAttributes", new Type[] { typeof(Type), typeof(bool) });
-
             ilGen.Emit(OpCodes.Ldloc, local);
             ilGen.EmitTypeOf<T>();
             ilGen.Emit(inherited == true ? OpCodes.Ldc_I4_1 : OpCodes.Ldc_I4_0);
-            ilGen.Emit(OpCodes.Callvirt, getAttributes);
+            ilGen.Emit(OpCodes.Callvirt, Type_GetCustomAttributes);
             return ilGen;
         }
 
@@ -1146,15 +1222,46 @@ namespace AutoAdapter.Reflection
             LocalBuilder localSourceValue,
             LocalBuilder localAdaptedValue)
         {
-            Type sourceType  = localSourceValue.LocalType;
             Type adaptedType = localAdaptedValue.LocalType;
+
+            ilGen.EmitAdaptedValue(adapterContext, localSourceValue, adaptedType);
+            ilGen.Emit(OpCodes.Stloc, localAdaptedValue);
+        }
+
+        /// <summary>
+        /// Emits IL to generate an adapted value.
+        /// </summary>
+        /// <param name="ilGen">The <see cref="ILGenerator"/> to use.</param>
+        /// <param name="adapterContext">The <see cref="AdapterContext"/>.</param>
+        /// <param name="localSourceValue">A <see cref="LocalBuilder"/> containing the source value.</param>
+        /// <param name="localAdaptedValue">A <see cref="LocalBuilder"/> to receive the adapted value.</param>
+        public static void EmitAdaptedValue(
+            this ILGenerator ilGen,
+            AdapterContext adapterContext,
+            LocalBuilder localSourceValue,
+            Type adaptedType)
+        {
+            Type sourceType  = localSourceValue.LocalType;
+
+            var end = ilGen.DefineLabel();
+            var isAdapted = ilGen.DefineLabel();
+
+            ilGen.EmitIsAssignableFrom<IAdaptedObject>(localSourceValue);
+            ilGen.Emit(OpCodes.Brtrue_S, isAdapted);
 
             ilGen.Emit(OpCodes.Ldloc, localSourceValue);
             ilGen.EmitAdaptedValue(
                 adapterContext,
                 sourceType,
                 adaptedType);
-            ilGen.Emit(OpCodes.Stloc, localAdaptedValue);
+            ilGen.Emit(OpCodes.Br_S, end);
+
+            ilGen.MarkLabel(isAdapted);
+            ilGen.Emit(OpCodes.Ldloc, localSourceValue);
+            ilGen.Emit(OpCodes.Castclass, typeof(IAdaptedObject));
+            ilGen.EmitGetProperty("AdaptedObject", typeof(IAdaptedObject));
+
+            ilGen.MarkLabel(end);
         }
 
         /// <summary>
@@ -1170,6 +1277,12 @@ namespace AutoAdapter.Reflection
             Type sourceType,
             Type adaptedType)
         {
+            if (sourceType == adaptedType)
+            {
+                ilGen.ThrowException<InvalidOperationException>("Trying to adapt to the same type");
+                return;
+            }
+
             var adapterCtor = adapterContext.GetAdapterConstructor(sourceType, adaptedType);
             if (adapterCtor == null)
             {
