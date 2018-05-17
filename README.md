@@ -8,8 +8,9 @@
 
 ## Defining an Adapter
 
-An adpater type is defined by creating an interface containg the methods, properties, and events that
-are required from the type being adapted.
+An adpater type is defined by creating an interface containing the methods, properties, and events that
+are required from the type being adapted. The adapter is then created by calling the CreateAdapter() method
+on the object being adapted. This is provided by an extension method on the *object* type.
 
 ## Examples
 
@@ -27,8 +28,6 @@ public class AdaptedType
 public interface AdapterType
 {
     string Value { get; set; }
-
-    bool Method(string parameter1, bool parameter2, int paremeter3);
 }
 
 var adaptedType = new AdaptedType() { Value = "Hello World" };
