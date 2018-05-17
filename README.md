@@ -4,13 +4,11 @@
 
 ## Installation
 
-[AutoAdapyter is available on Nuget](https://www.nuget.org/packages/AutoAdapter)
+[AutoAdapter is available on Nuget](https://www.nuget.org/packages/AutoAdapter)
 
 ## Defining an Adapter
 
-An adpater type is defined by creating an interface containing the methods, properties, and events that
-are required from the type being adapted. The adapter is then created by calling the CreateAdapter() method
-on the object being adapted. This is provided by an extension method on the *object* type.
+An adapter type is defined by creating an interface containing the methods, properties, and events that are required from the type being adapted. The adapter is then created by calling the CreateAdapter() method on the object being adapted. This is provided by an extension method on the *object* type.
 
 ## Examples
 
